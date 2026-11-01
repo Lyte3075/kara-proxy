@@ -95,6 +95,8 @@ export interface BrowserTab {
   navIdx: number;
   loading: boolean;
   error: string | null;
+  /** When non-null, the tab is rendering a YouTube embed instead of a proxied iframe */
+  youtube: import("./utils").YouTubeTarget | null;
 }
 
 /* ---------- Vault ---------- */

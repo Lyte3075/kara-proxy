@@ -243,6 +243,32 @@ function injectKaraScripts(html, contentLength, targetUrl, workerBase) {
   window.WebSocket.OPEN=NativeWebSocket.OPEN;
   window.WebSocket.CLOSING=NativeWebSocket.CLOSING;
   window.WebSocket.CLOSED=NativeWebSocket.CLOSED;
+  /* YouTube link interception — notify parent instead of proxying */
+  function extractYouTubeId(href){
+    try{var u=new URL(href,targetBase);var host=u.hostname.replace(/^www\\./,'').toLowerCase();
+    if(['youtube.com','m.youtube.com','youtu.be','music.youtube.com'].indexOf(host)===-1)return null;
+    var vid=null;
+    if(host==='youtu.be')vid=u.pathname.slice(1).split('/')[0];
+    else if(u.pathname==='/watch')vid=u.searchParams.get('v');
+    else if(u.pathname.indexOf('/embed/')===0)vid=u.pathname.split('/')[2];
+    else if(u.pathname.indexOf('/shorts/')===0)vid=u.pathname.split('/')[2];
+    else if(u.pathname.indexOf('/live/')===0)vid=u.pathname.split('/')[2];
+    return (vid&&/^[a-zA-Z0-9_-]{11}$/.test(vid))?vid:null;}catch(e){return null;}
+  }
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a');if(!a)return;var vid=extractYouTubeId(a.href);if(!vid)return;
+    e.preventDefault();e.stopPropagation();
+    try{window.parent.postMessage({type:'kara-youtube',videoId:vid,href:a.href},'*');}catch(err){}
+  },true);
+  /* Intercept YouTube iframe embeds — replace with nocookie embed */
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('iframe[src]').forEach(function(f){
+      var vid=extractYouTubeId(f.src);if(!vid)return;
+      var s='https://www.youtube-nocookie.com/embed/'+vid+'?autoplay=0&rel=0&modestbranding=1';
+      try{var u=new URL(f.src,targetBase);if(u.searchParams.get('list'))s+='&list='+u.searchParams.get('list');if(u.searchParams.get('t')||u.searchParams.get('start'))s+='&start='+(u.searchParams.get('t')||u.searchParams.get('start'));}catch(e){}
+      f.src=s;f.removeAttribute('sandbox');
+    });
+  });
 })();<\/script>`;
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + script);
   return script + html;

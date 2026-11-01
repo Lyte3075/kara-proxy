@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock, Settings as SettingsIcon, HelpCircle, KeyRound, BarChart3 } from "lucide-react";
 import AddressBar from "@/proxy/AddressBar";
 import ProxyView from "@/proxy/ProxyView";
+import YouTubeView from "@/proxy/YouTubeView";
 import HistoryPanel from "@/proxy/HistoryPanel";
 import StartPage from "@/proxy/StartPage";
 import SettingsPage from "@/proxy/SettingsPage";
@@ -17,7 +18,7 @@ import {
   buildProxiedUrl, buildSearchUrl, createTab, getSearchEngine,
   loadBookmarks, loadCustomEngines, loadEncryptedVault, loadHistory, loadSettings,
   loadShortcuts, loadStats, loadCustomPalettes, loadSpeedTests,
-  normalizeInput, recordBlocked, recordRequest,
+  normalizeInput, parseYouTubeUrl, recordBlocked, recordRequest,
   saveBookmarks, saveCustomEngines, saveEncryptedVault, saveHistory, saveSettings,
   saveShortcuts, saveStats, saveCustomPalettes, saveSpeedTest,
   applyCustomPalette, uid,
@@ -74,10 +75,11 @@ function App() {
       if (!e.data) return;
       if (e.data.type === "kara-stats" && typeof e.data.bytes === "number") setStats((prev) => recordRequest(prev, e.data.bytes));
       else if (e.data.type === "kara-blocked") setStats((prev) => recordBlocked(prev));
+      else if (e.data.type === "kara-youtube" && typeof e.data.href === "string") navigateTo(e.data.href);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [navigateTo]);
 
   /* ---------- tab helpers ---------- */
   const updateTab = useCallback((id: string, patch: Partial<BrowserTab>) => setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t))), []);
@@ -92,21 +94,26 @@ function App() {
     if (!tab) return;
     const normalized = normalizeInput(rawTarget);
     const finalTarget = normalized ?? buildSearchUrl(searchEngine, rawTarget.trim());
-    let url: string;
-    try { const dest = new URL(finalTarget); url = dest.origin === window.location.origin ? finalTarget : buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); } catch { url = buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); }
+    const yt = parseYouTubeUrl(finalTarget);
     const newHistory = tab.navIdx < tab.history.length - 1 ? tab.history.slice(0, tab.navIdx + 1) : [...tab.history];
     newHistory.push(finalTarget);
-    updateTab(tabId, { url: finalTarget, iframeUrl: url, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
+    if (yt) {
+      updateTab(tabId, { url: finalTarget, iframeUrl: null, loading: false, error: null, history: newHistory, navIdx: newHistory.length - 1, youtube: yt });
+    } else {
+      let url: string;
+      try { const dest = new URL(finalTarget); url = dest.origin === window.location.origin ? finalTarget : buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); } catch { url = buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); }
+      updateTab(tabId, { url: finalTarget, iframeUrl: url, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1, youtube: null });
+    }
     if (tabId === activeTabId) setInput(finalTarget);
     setStatsOpen(false); setHistoryOpen(false);
     setHistory((prev) => { const entry: HistoryEntry = { url: finalTarget, displayUrl: finalTarget.replace(/^https?:\/\//, ""), title: finalTarget.replace(/^https?:\/\//, ""), ts: Date.now() }; return [entry, ...prev.filter((h) => h.url !== finalTarget)].slice(0, 100); });
   }, [tabs, activeTabId, settings.relay, settings.blockTrackers, searchEngine, updateTab]);
 
-  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null }); setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
-  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null }); setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
+  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; const yt = parseYouTubeUrl(t); if (yt) { updateActiveTab({ navIdx: i, url: t, iframeUrl: null, loading: false, error: null, youtube: yt }); } else { updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null, youtube: null }); } setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
+  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; const yt = parseYouTubeUrl(t); if (yt) { updateActiveTab({ navIdx: i, url: t, iframeUrl: null, loading: false, error: null, youtube: yt }); } else { updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null, youtube: null }); } setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
   const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
-  const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
+  const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null, youtube: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
 
   /* ---------- settings & data ---------- */
@@ -164,7 +171,7 @@ function App() {
   const proxied = activeTab.iframeUrl ? activeTab.iframeUrl.includes("/proxy?") : false;
   const canGoBack = activeTab.navIdx > 0;
   const canGoForward = activeTab.navIdx < activeTab.history.length - 1;
-  const showStartPage = !activeTab.iframeUrl && !activeTab.error && !statsOpen;
+  const showStartPage = !activeTab.iframeUrl && !activeTab.error && !statsOpen && !activeTab.youtube;
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden">
@@ -203,6 +210,8 @@ function App() {
         <StatsDashboard stats={stats} history={history} relay={settings.relay} speedTests={speedTests} onSpeedTest={handleSpeedTest} onAddBlockedDomain={addBlockedDomain} onRemoveBlockedDomain={removeBlockedDomain} onAllowDomain={allowDomain} onRemoveAllowed={removeAllowed} onClose={() => setStatsOpen(false)} />
       ) : historyOpen ? (
         <HistoryPanel open={historyOpen} history={history} onOpen={openHistoryEntry} onRemove={removeHistoryEntry} onClear={clearHistory} onClose={() => setHistoryOpen(false)} />
+      ) : activeTab.youtube ? (
+        <YouTubeView target={activeTab.youtube} onBack={handleHome} />
       ) : (
         <ProxyView iframeUrl={activeTab.iframeUrl} loading={activeTab.loading} error={activeTab.error} onLoad={handleLoad} onHome={handleHome} autofillPayload={autofillPayload} />
       )}
@@ -219,7 +228,8 @@ function App() {
 
       <footer className="flex items-center justify-between px-4 py-1.5 border-t text-[11px] text-[var(--text-muted)] shrink-0" style={{ borderColor: "var(--border-primary)", background: "var(--bg-base)" }}>
         <span className="flex items-center gap-1.5">
-          {proxied ? (<><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 6px rgba(52,211,153,0.5)" }} /> Relayed</>)
+          {activeTab.youtube ? (<><span className="w-1.5 h-1.5 rounded-full bg-red-500" style={{ boxShadow: "0 0 6px rgba(239,68,68,0.5)" }} /> YouTube</>)
+          : proxied ? (<><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 6px rgba(52,211,153,0.5)" }} /> Relayed</>)
           : activeTab.iframeUrl ? (<><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Direct</>)
           : (<><span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)" }} /> Idle</>)}
         </span>

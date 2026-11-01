@@ -259,6 +259,87 @@ export function buildProxiedUrl(relay: string, target: string, blockTrackers = f
   return `${relay.replace(/\/+$/, "")}/proxy?${params.toString()}`;
 }
 
+/* ---------- YouTube helpers ---------- */
+
+export interface YouTubeTarget {
+  videoId: string;
+  start: number;
+  list: string | null;
+  embedUrl: string;
+  watchUrl: string;
+  isYouTube: true;
+}
+
+export function parseYouTubeUrl(input: string): YouTubeTarget | null {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  // Bare 11-char video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
+    return buildYouTubeTarget(raw, 0, null);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+  } catch {
+    return null;
+  }
+
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+  if (!["youtube.com", "m.youtube.com", "youtu.be", "youtube-nocookie.com", "music.youtube.com"].includes(host)) {
+    return null;
+  }
+
+  let videoId: string | null = null;
+  let start = 0;
+
+  if (host === "youtu.be") {
+    videoId = url.pathname.slice(1).split("/")[0] || null;
+  } else if (url.pathname === "/watch" || url.pathname.startsWith("/watch/")) {
+    videoId = url.searchParams.get("v");
+  } else if (url.pathname.startsWith("/embed/")) {
+    videoId = url.pathname.split("/")[2] || null;
+  } else if (url.pathname.startsWith("/shorts/")) {
+    videoId = url.pathname.split("/")[2] || null;
+  } else if (url.pathname.startsWith("/live/")) {
+    videoId = url.pathname.split("/")[2] || null;
+  }
+
+  const tParam = url.searchParams.get("t") || url.searchParams.get("start");
+  if (tParam) start = parseTimestamp(tParam);
+
+  const list = url.searchParams.get("list");
+
+  if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return buildYouTubeTarget(videoId, start, list);
+  }
+
+  return null;
+}
+
+function parseTimestamp(t: string): number {
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  const m = t.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
+  if (!m) return 0;
+  const h = parseInt(m[1] || "0", 10);
+  const min = parseInt(m[2] || "0", 10);
+  const s = parseInt(m[3] || "0", 10);
+  return h * 3600 + min * 60 + s;
+}
+
+function buildYouTubeTarget(videoId: string, start: number, list: string | null): YouTubeTarget {
+  const params = new URLSearchParams();
+  params.set("autoplay", "1");
+  params.set("rel", "0");
+  params.set("modestbranding", "1");
+  if (start > 0) params.set("start", String(start));
+  if (list) params.set("list", list);
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`;
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  return { videoId, start, list, embedUrl, watchUrl, isYouTube: true };
+}
+
 export function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return "just now";
@@ -306,5 +387,5 @@ export function downloadBackupFile(file: BackupFile): void {
 /* ---------- tabs ---------- */
 
 export function createTab(): BrowserTab {
-  return { id: uid(), title: "New Tab", url: null, iframeUrl: null, history: [], navIdx: -1, loading: false, error: null };
+  return { id: uid(), title: "New Tab", url: null, iframeUrl: null, history: [], navIdx: -1, loading: false, error: null, youtube: null };
 }
