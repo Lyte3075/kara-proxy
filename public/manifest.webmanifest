@@ -1,0 +1,17 @@
+{
+  "name": "Kara — Private Web Relay",
+  "short_name": "Kara",
+  "description": "A private, relay-backed browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#090b10",
+  "icons": [
+    {
+      "src": "/Kara.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Theme system: CSS variables are set on :root via data-theme-color and data-theme-mode.
+  Components reference these via Tailwind arbitrary values, e.g. bg-[var(--bg-base)].
+  Five color themes × dark/light mode = 10 palettes.
+*/
+
+:root {
+  /* Defaults (dark crimson) */
+  --bg-base: #0a0306;
+  --bg-elev: #14080a;
+  --bg-input: rgba(0, 0, 0, 0.4);
+  --bg-surface: rgba(0, 0, 0, 0.2);
+  --border-primary: rgba(127, 29, 29, 0.4);
+  --border-subtle: rgba(127, 29, 29, 0.2);
+  --border-faint: rgba(127, 29, 29, 0.15);
+  --border-dashed: rgba(127, 29, 29, 0.25);
+  --accent: #ef4444;
+  --accent-bright: #f87171;
+  --accent-hover: #dc2626;
+  --accent-soft: rgba(239, 68, 68, 0.5);
+  --accent-tint: rgba(127, 29, 29, 0.4);
+  --accent-glow: rgba(239, 68, 68, 0.2);
+  --accent-grad-from: #dc2626;
+  --accent-grad-to: #7f1d1d;
+  --accent-shadow: rgba(127, 29, 29, 0.3);
+  --accent-shadow-strong: rgba(127, 29, 29, 0.4);
+  --text-primary: #ffffff;
+  --text-secondary: #d4d4d8;
+  --text-muted: #71717a;
+  --text-faint: #52525b;
+  --text-on-accent: #ffffff;
+  --btn-hover: rgba(127, 29, 29, 0.3);
+}
+
+/* ---- Dark modes ---- */
+
+[data-theme-mode="dark"][data-theme-color="red"] {
+  --bg-base: #0a0306; --bg-elev: #14080a;
+  --border-primary: rgba(127,29,29,0.4); --border-subtle: rgba(127,29,29,0.2);
+  --border-faint: rgba(127,29,29,0.15); --border-dashed: rgba(127,29,29,0.25);
+  --accent: #ef4444; --accent-bright: #f87171; --accent-hover: #dc2626;
+  --accent-soft: rgba(239,68,68,0.5); --accent-tint: rgba(127,29,29,0.4);
+  --accent-glow: rgba(239,68,68,0.2); --accent-grad-from: #dc2626; --accent-grad-to: #7f1d1d;
+  --accent-shadow: rgba(127,29,29,0.3); --accent-shadow-strong: rgba(127,29,29,0.4);
+  --text-primary: #fff; --text-secondary: #d4d4d8; --text-muted: #71717a; --text-faint: #52525b;
+  --btn-hover: rgba(127,29,29,0.3);
+}
+
+[data-theme-mode="dark"][data-theme-color="blue"] {
+  --bg-base: #03060f; --bg-elev: #080d1a;
+  --border-primary: rgba(30,58,138,0.4); --border-subtle: rgba(30,58,138,0.2);
+  --border-faint: rgba(30,58,138,0.15); --border-dashed: rgba(30,58,138,0.25);
+  --accent: #3b82f6; --accent-bright: #60a5fa; --accent-hover: #2563eb;
+  --accent-soft: rgba(59,130,246,0.5); --accent-tint: rgba(30,58,138,0.4);
+  --accent-glow: rgba(59,130,246,0.2); --accent-grad-from: #2563eb; --accent-grad-to: #1e3a8a;
+  --accent-shadow: rgba(30,58,138,0.3); --accent-shadow-strong: rgba(30,58,138,0.4);
+  --text-primary: #fff; --text-secondary: #d4d4d8; --text-muted: #71717a; --text-faint: #52525b;
+  --btn-hover: rgba(30,58,138,0.3);
+}
+
+[data-theme-mode="dark"][data-theme-color="green"] {
+  --bg-base: #030f06; --bg-elev: #08140a;
+  --border-primary: rgba(20,83,45,0.4); --border-subtle: rgba(20,83,45,0.2);
+  --border-faint: rgba(20,83,45,0.15); --border-dashed: rgba(20,83,45,0.25);
+  --accent: #22c55e; --accent-bright: #4ade80; --accent-hover: #16a34a;
+  --accent-soft: rgba(34,197,94,0.5); --accent-tint: rgba(20,83,45,0.4);
+  --accent-glow: rgba(34,197,94,0.2); --accent-grad-from: #16a34a; --accent-grad-to: #14532d;
+  --accent-shadow: rgba(20,83,45,0.3); --accent-shadow-strong: rgba(20,83,45,0.4);
+  --text-primary: #fff; --text-secondary: #d4d4d8; --text-muted: #71717a; --text-faint: #52525b;
+  --btn-hover: rgba(20,83,45,0.3);
+}
+
+[data-theme-mode="dark"][data-theme-color="amber"] {
+  --bg-base: #0f0903; --bg-elev: #1a1208;
+  --border-primary: rgba(146,64,14,0.4); --border-subtle: rgba(146,64,14,0.2);
+  --border-faint: rgba(146,64,14,0.15); --border-dashed: rgba(146,64,14,0.25);
+  --accent: #f59e0b; --accent-bright: #fbbf24; --accent-hover: #d97706;
+  --accent-soft: rgba(245,158,11,0.5); --accent-tint: rgba(146,64,14,0.4);
+  --accent-glow: rgba(245,158,11,0.2); --accent-grad-from: #d97706; --accent-grad-to: #92400e;
+  --accent-shadow: rgba(146,64,14,0.3); --accent-shadow-strong: rgba(146,64,14,0.4);
+  --text-primary: #fff; --text-secondary: #d4d4d8; --text-muted: #a1a1aa; --text-faint: #71717a;
+  --btn-hover: rgba(146,64,14,0.3);
+}
+
+[data-theme-mode="dark"][data-theme-color="violet"] {
+  --bg-base: #08030f; --bg-elev: #10081a;
+  --border-primary: rgba(91,33,182,0.4); --border-subtle: rgba(91,33,182,0.2);
+  --border-faint: rgba(91,33,182,0.15); --border-dashed: rgba(91,33,182,0.25);
+  --accent: #a855f7; --accent-bright: #c084fc; --accent-hover: #9333ea;
+  --accent-soft: rgba(168,85,247,0.5); --accent-tint: rgba(91,33,182,0.4);
+  --accent-glow: rgba(168,85,247,0.2); --accent-grad-from: #9333ea; --accent-grad-to: #5b21b6;
+  --accent-shadow: rgba(91,33,182,0.3); --accent-shadow-strong: rgba(91,33,182,0.4);
+  --text-primary: #fff; --text-secondary: #d4d4d8; --text-muted: #71717a; --text-faint: #52525b;
+  --btn-hover: rgba(91,33,182,0.3);
+}
+
+/* ---- Light modes ---- */
+
+[data-theme-mode="light"][data-theme-color="red"] {
+  --bg-base: #faf5f5; --bg-elev: #ffffff;
+  --bg-input: rgba(0,0,0,0.03); --bg-surface: rgba(0,0,0,0.02);
+  --border-primary: rgba(185,28,28,0.3); --border-subtle: rgba(185,28,28,0.15);
+  --border-faint: rgba(185,28,28,0.1); --border-dashed: rgba(185,28,28,0.2);
+  --accent: #dc2626; --accent-bright: #ef4444; --accent-hover: #b91c1c;
+  --accent-soft: rgba(220,38,38,0.4); --accent-tint: rgba(254,226,226,0.6);
+  --accent-glow: rgba(220,38,38,0.1); --accent-grad-from: #dc2626; --accent-grad-to: #b91c1c;
+  --accent-shadow: rgba(220,38,38,0.15); --accent-shadow-strong: rgba(220,38,38,0.2);
+  --text-primary: #1a0a0a; --text-secondary: #525252; --text-muted: #a3a3a3; --text-faint: #d4d4d4;
+  --text-on-accent: #fff; --btn-hover: rgba(254,226,226,0.5);
+}
+
+[data-theme-mode="light"][data-theme-color="blue"] {
+  --bg-base: #f5f8ff; --bg-elev: #ffffff;
+  --bg-input: rgba(0,0,0,0.03); --bg-surface: rgba(0,0,0,0.02);
+  --border-primary: rgba(37,99,235,0.3); --border-subtle: rgba(37,99,235,0.15);
+  --border-faint: rgba(37,99,235,0.1); --border-dashed: rgba(37,99,235,0.2);
+  --accent: #2563eb; --accent-bright: #3b82f6; --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37,99,235,0.4); --accent-tint: rgba(219,234,254,0.6);
+  --accent-glow: rgba(37,99,235,0.1); --accent-grad-from: #2563eb; --accent-grad-to: #1d4ed8;
+  --accent-shadow: rgba(37,99,235,0.15); --accent-shadow-strong: rgba(37,99,235,0.2);
+  --text-primary: #0a1020; --text-secondary: #525252; --text-muted: #a3a3a3; --text-faint: #d4d4d4;
+  --text-on-accent: #fff; --btn-hover: rgba(219,234,254,0.5);
+}
+
+[data-theme-mode="light"][data-theme-color="green"] {
+  --bg-base: #f3faf5; --bg-elev: #ffffff;
+  --bg-input: rgba(0,0,0,0.03); --bg-surface: rgba(0,0,0,0.02);
+  --border-primary: rgba(22,163,74,0.3); --border-subtle: rgba(22,163,74,0.15);
+  --border-faint: rgba(22,163,74,0.1); --border-dashed: rgba(22,163,74,0.2);
+  --accent: #16a34a; --accent-bright: #22c55e; --accent-hover: #15803d;
+  --accent-soft: rgba(22,163,74,0.4); --accent-tint: rgba(220,252,231,0.6);
+  --accent-glow: rgba(22,163,74,0.1); --accent-grad-from: #16a34a; --accent-grad-to: #15803d;
+  --accent-shadow: rgba(22,163,74,0.15); --accent-shadow-strong: rgba(22,163,74,0.2);
+  --text-primary: #0a1a0e; --text-secondary: #525252; --text-muted: #a3a3a3; --text-faint: #d4d4d4;
+  --text-on-accent: #fff; --btn-hover: rgba(220,252,231,0.5);
+}
+
+[data-theme-mode="light"][data-theme-color="amber"] {
+  --bg-base: #fdf8f0; --bg-elev: #ffffff;
+  --bg-input: rgba(0,0,0,0.03); --bg-surface: rgba(0,0,0,0.02);
+  --border-primary: rgba(217,119,6,0.3); --border-subtle: rgba(217,119,6,0.15);
+  --border-faint: rgba(217,119,6,0.1); --border-dashed: rgba(217,119,6,0.2);
+  --accent: #d97706; --accent-bright: #f59e0b; --accent-hover: #b45309;
+  --accent-soft: rgba(217,119,6,0.4); --accent-tint: rgba(254,243,199,0.6);
+  --accent-glow: rgba(217,119,6,0.1); --accent-grad-from: #d97706; --accent-grad-to: #b45309;
+  --accent-shadow: rgba(217,119,6,0.15); --accent-shadow-strong: rgba(217,119,6,0.2);
+  --text-primary: #1a1006; --text-secondary: #525252; --text-muted: #a3a3a3; --text-faint: #d4d4d4;
+  --text-on-accent: #fff; --btn-hover: rgba(254,243,199,0.5);
+}
+
+[data-theme-mode="light"][data-theme-color="violet"] {
+  --bg-base: #f7f5fc; --bg-elev: #ffffff;
+  --bg-input: rgba(0,0,0,0.03); --bg-surface: rgba(0,0,0,0.02);
+  --border-primary: rgba(147,51,234,0.3); --border-subtle: rgba(147,51,234,0.15);
+  --border-faint: rgba(147,51,234,0.1); --border-dashed: rgba(147,51,234,0.2);
+  --accent: #9333ea; --accent-bright: #a855f7; --accent-hover: #7e22ce;
+  --accent-soft: rgba(147,51,234,0.4); --accent-tint: rgba(243,232,255,0.6);
+  --accent-glow: rgba(147,51,234,0.1); --accent-grad-from: #9333ea; --accent-grad-to: #7e22ce;
+  --accent-shadow: rgba(147,51,234,0.15); --accent-shadow-strong: rgba(147,51,234,0.2);
+  --text-primary: #14081a; --text-secondary: #525252; --text-muted: #a3a3a3; --text-faint: #d4d4d4;
+  --text-on-accent: #fff; --btn-hover: rgba(243,232,255,0.5);
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:ring-1 transition;
+    background: var(--bg-input);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+    --tw-placeholder-opacity: 1;
+  }
+  .input::placeholder {
+    color: var(--text-faint);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    --tw-ring-color: var(--accent-soft);
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40;
+    background: var(--accent-grad-from);
+    color: var(--text-on-accent);
+    box-shadow: 0 4px 12px var(--accent-shadow);
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
+  }
+  .btn-primary:disabled:hover {
+    background: var(--accent-grad-from);
+  }
+}
+
+/* Thin scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--accent-tint);
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-soft);
+}
