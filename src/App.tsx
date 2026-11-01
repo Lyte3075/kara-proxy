@@ -171,7 +171,7 @@ function App() {
       <header className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0" style={{ borderColor: "var(--border-primary)", background: "var(--bg-base)" }}>
         <button onClick={handleHome} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--btn-hover)] transition shrink-0" aria-label="Home">
           <span className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shadow-lg" style={{ background: "var(--accent-grad-from)", boxShadow: "0 4px 12px var(--accent-shadow)" }}>
-            <img src="/Kara.png" alt="Kara" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}Kara.png`} alt="Kara" className="w-full h-full object-cover" />
           </span>
           <span className="text-sm font-bold tracking-tight hidden sm:block">Kara</span>
         </button>
