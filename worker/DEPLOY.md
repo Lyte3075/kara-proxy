@@ -31,4 +31,5 @@ In the deployed proxy page, open the **Settings** (gear icon) and paste your rel
 - The free Cloudflare plan allows **100,000 requests/day** — plenty for personal browsing.
 - Sites that require login or aggressively detect proxies (banking, some streaming) may not work.
 - Only http/https targets are allowed. The relay drops your real IP from forwarded headers.
+- **WebSocket support:** the relay proxies real-time WebSocket connections (ws:// and wss://) via the `/ws?url=<target>` endpoint. Proxied pages automatically have their WebSocket connections redirected through the relay so chat apps, live feeds, and streaming services can work. This works on the free Cloudflare plan.
 - This tool is for reaching publicly available web content. Don't use it to bypass access controls put in place by a network owner or employer.

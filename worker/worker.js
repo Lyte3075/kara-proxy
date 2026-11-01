@@ -51,7 +51,7 @@ export default {
     }
 
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ ok: true, service: "proxy-relay" }), {
+      return new Response(JSON.stringify({ ok: true, service: "proxy-relay", websockets: true }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -63,8 +63,13 @@ export default {
       return new Response(buf, { headers: { "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Kara-Bytes": String(buf.length), ...corsHeaders } });
     }
 
+    // WebSocket proxy endpoint: /ws?url=<ws|wss target>
+    if (url.pathname === "/ws") {
+      return handleWebSocketUpgrade(url);
+    }
+
     if (url.pathname !== "/proxy") {
-      return new Response(JSON.stringify({ error: "Not found. Use /proxy?url=<target>" }), {
+      return new Response(JSON.stringify({ error: "Not found. Use /proxy?url=<target> or /ws?url=<target>" }), {
         status: 404,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
@@ -223,7 +228,111 @@ function injectKaraScripts(html, contentLength, targetUrl, workerBase) {
   try{window.parent.postMessage({type:'kara-stats',bytes:${contentLength}},'*');}catch(e){}
   if(window.fetch){var of=window.fetch;window.fetch=function(input,init){var raw=typeof input==='string'?input:input&&input.url;var next=proxyUrl(raw||input);return of.call(this,next,init).then(function(r){if(r.status===451){try{window.parent.postMessage({type:'kara-blocked'},'*');}catch(e){}}return r;});};}
   var oo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(method,url,async,user,password){var xhr=this;xhr.addEventListener('load',function(){if(xhr.status===451){try{window.parent.postMessage({type:'kara-blocked'},'*');}catch(e){}}});return oo.call(this,method,proxyUrl(url),async,user,password);};
+
+  /* WebSocket relay interception */
+  var wsRelayBase=location.origin+'/ws?url=';
+  var NativeWebSocket=window.WebSocket;
+  window.WebSocket=function(targetUrl,protocols){
+    var u;try{u=new URL(targetUrl,targetBase);}catch(e){return new NativeWebSocket(targetUrl,protocols);}
+    if(u.protocol!=='ws:'&&u.protocol!=='wss:'){return new NativeWebSocket(targetUrl,protocols);}
+    var relayed=wsRelayBase+encodeURIComponent(u.href);
+    return protocols!==undefined?new NativeWebSocket(relayed,protocols):new NativeWebSocket(relayed);
+  };
+  window.WebSocket.prototype=NativeWebSocket.prototype;
+  window.WebSocket.CONNECTING=NativeWebSocket.CONNECTING;
+  window.WebSocket.OPEN=NativeWebSocket.OPEN;
+  window.WebSocket.CLOSING=NativeWebSocket.CLOSING;
+  window.WebSocket.CLOSED=NativeWebSocket.CLOSED;
 })();<\/script>`;
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + script);
   return script + html;
+}
+
+function handleWebSocketUpgrade(url) {
+  const target = url.searchParams.get("url");
+  if (!target) {
+    return new Response(JSON.stringify({ error: "Missing url parameter" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  let targetUrl;
+  try {
+    targetUrl = new URL(target);
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid target URL" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  if (!["ws:", "wss:"].includes(targetUrl.protocol)) {
+    return new Response(JSON.stringify({ error: "Only ws:// and wss:// targets are supported" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  const blockTrackers = url.searchParams.get("blockTrackers") === "1";
+  if (blockTrackers && isTracker(targetUrl.hostname)) {
+    return new Response(JSON.stringify({ blocked: true }), {
+      status: 451,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  const upstreamUrl = targetUrl.toString();
+  const [clientWs, serverWs] = new WebSocketPair();
+  serverWs.accept();
+
+  let closed = false;
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    try { clientWs.close(); } catch {}
+    try { serverWs.close(); } catch {}
+  };
+
+  let upstreamWs = null;
+
+  // Browser -> relay (buffer until upstream is ready, then forward)
+  serverWs.addEventListener("message", (event) => {
+    if (upstreamWs) { try { upstreamWs.send(event.data); } catch {} }
+  });
+  serverWs.addEventListener("close", cleanup);
+  serverWs.addEventListener("error", cleanup);
+
+  // Connect to the real upstream WebSocket
+  (async () => {
+    try {
+      const upstream = await fetch(upstreamUrl, {
+        headers: {
+          "Upgrade": "websocket",
+          "Connection": "Upgrade",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+
+      if (upstream.status !== 101 || !upstream.webSocket) {
+        try { clientWs.send(JSON.stringify({ error: "upstream refused websocket", status: upstream.status })); } catch {}
+        cleanup();
+        return;
+      }
+
+      upstreamWs = upstream.webSocket;
+
+      // Upstream -> browser
+      upstreamWs.addEventListener("message", (event) => {
+        try { clientWs.send(event.data); } catch {}
+      });
+      upstreamWs.addEventListener("close", cleanup);
+      upstreamWs.addEventListener("error", cleanup);
+    } catch (err) {
+      try { clientWs.send(JSON.stringify({ error: "relay connect failed", detail: String(err) })); } catch {}
+      cleanup();
+    }
+  })();
+
+  return new Response(null, { status: 101, webSocket: clientWs, headers: corsHeaders });
 }
