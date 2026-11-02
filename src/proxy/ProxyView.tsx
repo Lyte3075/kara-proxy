@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Home, Globe } from "lucide-react";
 
 interface ProxyViewProps {
