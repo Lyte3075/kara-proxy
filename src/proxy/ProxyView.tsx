@@ -12,8 +12,16 @@ interface ProxyViewProps {
 
 export default function ProxyView({ iframeUrl, loading, error, onLoad, onHome, autofillPayload }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [slowLoad, setSlowLoad] = useState(false);
 
   useEffect(() => { if (iframeUrl) iframeRef.current?.focus?.(); }, [iframeUrl]);
+
+  useEffect(() => {
+    setSlowLoad(false);
+    if (!loading) return;
+    const t = setTimeout(() => setSlowLoad(true), 12000);
+    return () => clearTimeout(t);
+  }, [loading, iframeUrl]);
 
   useEffect(() => {
     if (!autofillPayload || !iframeRef.current) return;
@@ -61,7 +69,10 @@ export default function ProxyView({ iframeUrl, loading, error, onLoad, onHome, a
     <div className="flex-1 relative bg-[var(--bg-base)]">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none" style={{ background: "var(--bg-base)" }}>
-          <Loader2 size={28} className="text-[var(--accent)] animate-spin" />
+          <div className="text-center">
+            <Loader2 size={28} className="text-[var(--accent)] animate-spin mx-auto" />
+            {slowLoad && <p className="mt-3 text-xs text-[var(--text-muted)]">Still loading — the site may be slow or blocking the relay.</p>}
+          </div>
         </div>
       )}
       <iframe
