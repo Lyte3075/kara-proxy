@@ -101,7 +101,6 @@ export default function SettingsPage({
   const allEngines = [...SEARCH_ENGINES, ...customEngines];
   const dirty =
     relay !== settings.relay ||
-    relayToken !== settings.relayToken ||
     engineId !== settings.searchEngineId ||
     themeColor !== settings.themeColor ||
     themeMode !== settings.themeMode ||
@@ -111,7 +110,7 @@ export default function SettingsPage({
   const handleSave = () => {
     onSave({
       relay: relay.trim() || DEFAULT_RELAY,
-      relayToken: relayToken.trim() || DEFAULT_RELAY_TOKEN,
+      relayToken: DEFAULT_RELAY_TOKEN,
       searchEngineId: engineId,
       themeColor,
       themeMode,
@@ -186,21 +185,6 @@ export default function SettingsPage({
                   Enter the secure WebSocket URL of your Wisp relay. Use the endpoint provided by your host, usually ending in /wisp/.
                 </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Wisp access token</label>
-                <input
-                  type="password"
-                  value={relayToken}
-                  onChange={(e) => setRelayToken(e.target.value)}
-                  placeholder="Paste the WISP_TOKEN from your relay host"
-                  autoComplete="new-password"
-                  spellCheck={false}
-                  className="input font-mono"
-                />
-                <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
-                  This is the token you set as the WISP_TOKEN environment variable when deploying the relay. It is stored only in this browser's local settings.
-                </p>
-              </div>
               <div className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <input
                   id="block-trackers"
@@ -217,7 +201,7 @@ export default function SettingsPage({
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
                 <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">Default: no shared relay is preconfigured. Add your own Wisp endpoint and token.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">Default: no shared relay is preconfigured. Add your Wisp endpoint.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
@@ -225,10 +209,10 @@ export default function SettingsPage({
                 </h3>
                 <ol className="space-y-2 text-xs text-[var(--text-secondary)] leading-relaxed list-decimal list-inside">
                   <li>Deploy this repository using its root <code className="text-[var(--accent-bright)]">railway.json</code> or <code className="text-[var(--accent-bright)]">render.yaml</code>, or build <code className="text-[var(--accent-bright)]">relay/Dockerfile</code> on any Docker host.</li>
-                  <li>Set <code className="text-[var(--accent-bright)]">WISP_TOKEN</code> to a random secret of at least 32 characters.</li>
+                  <li>No WISP_TOKEN is required. Leave it unset on Render.</li>
                   <li>Set <code className="text-[var(--accent-bright)]">ALLOWED_ORIGINS</code> to your exact Kara website origin.</li>
                   <li>Copy the host's HTTPS address, change it to <code className="text-[var(--accent-bright)]">wss://</code>, and append <code className="text-[var(--accent-bright)]">/wisp/</code>.</li>
-                  <li>Paste that endpoint and the same WISP_TOKEN above, then save.</li>
+                  <li>Paste the endpoint above and save.</li>
                 </ol>
                 <p className="text-xs text-[var(--text-faint)] leading-relaxed">The frontend stays static and can remain on GitHub Pages. The relay host must support persistent WebSocket connections.</p>
               </div>
