@@ -47,7 +47,7 @@ export function loadSettings(): Settings {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Settings>;
       return {
-        relay: typeof p.relay === "string" && (p.relay.startsWith("ws://") || p.relay.startsWith("wss://")) ? p.relay : DEFAULT_RELAY,
+        relay: (() => { const last = localStorage.getItem("kara-last-relay"); if (last && (last.startsWith("ws://") || last.startsWith("wss://"))) return last; return typeof p.relay === "string" && (p.relay.startsWith("ws://") || p.relay.startsWith("wss://")) ? p.relay : DEFAULT_RELAY; })(),
         relayToken: typeof p.relayToken === "string" ? p.relayToken : DEFAULT_RELAY_TOKEN,
         searchEngineId: p.searchEngineId || DEFAULT_SEARCH_ENGINE_ID,
         themeColor: p.themeColor || DEFAULT_THEME_COLOR,
@@ -61,7 +61,7 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(settings: Settings): void {
-  try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)); } catch {}
+  try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)); if (settings.relay) localStorage.setItem("kara-last-relay", settings.relay); } catch {}
 }
 
 /* ---------- shortcuts ---------- */

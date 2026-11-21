@@ -86,11 +86,11 @@ export default function ProxyView({
         health.search = "";
         health.hash = "";
         let lastError: unknown;
-        for (let attempt = 1; attempt <= 4; attempt += 1) {
+        for (let attempt = 1; attempt <= 10; attempt += 1) {
           if (cancelled) throw new Error("Relay check cancelled.");
-          setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/4)");
+          setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/10)");
           const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), 7000);
+          const timeout = window.setTimeout(() => abort.abort(), 15000);
           try {
             const response = await fetch(health.toString(), { method: "GET", cache: "no-store", mode: "cors", credentials: "omit", signal: abort.signal });
             if (!response.ok) throw new Error("Relay health check returned HTTP " + response.status + ".");
@@ -99,7 +99,7 @@ export default function ProxyView({
             return;
           } catch (cause) { lastError = cause; }
           finally { window.clearTimeout(timeout); }
-          if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, 2500));
+          if (attempt < 10) await new Promise((resolve) => window.setTimeout(resolve, 2500));
         }
         throw lastError instanceof Error ? lastError : new Error("Relay did not wake up in time.");
       };
