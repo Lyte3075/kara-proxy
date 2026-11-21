@@ -10,7 +10,5 @@ services:
     envVars:
       - key: PORT
         value: "8080"
-      - key: WISP_TOKEN
-        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
