@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   Server,
@@ -19,7 +19,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import type { Settings, BackupFile, EncryptedVault, HistoryEntry, Bookmark, SearchEngine, ProxyStats, ThemeColor, ThemeMode, CustomPalette } from "@/proxy/types";
-import { DEFAULT_RELAY, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
+import { DEFAULT_RELAY, DEFAULT_RELAY_TOKEN, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
 import {
   buildBackupFile,
   downloadBackupFile,
@@ -78,6 +78,19 @@ export default function SettingsPage({
   onSelectPalette,
 }: SettingsPageProps) {
   const [relay, setRelay] = useState(settings.relay);
+  useEffect(() => setRelay(settings.relay), [settings.relay]);
+  const [relayToken, setRelayToken] = useState(settings.relayToken);
+  const [relayName, setRelayName] = useState("");
+  const [savedRelays, setSavedRelays] = useState<Array<{ id: string; name: string; url: string; addedAt: number }>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("kara-saved-relays") || "[]");
+      return Array.isArray(stored)
+        ? stored.filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && typeof item.url === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [engineId, setEngineId] = useState(settings.searchEngineId);
   const [themeColor, setThemeColor] = useState<ThemeColor>(settings.themeColor);
   const [themeMode, setThemeMode] = useState<ThemeMode>(settings.themeMode);
@@ -108,7 +121,8 @@ export default function SettingsPage({
 
   const handleSave = () => {
     onSave({
-      relay: relay.trim().replace(/\/+$/, "") || DEFAULT_RELAY,
+      relay: relay.trim() || DEFAULT_RELAY,
+      relayToken: DEFAULT_RELAY_TOKEN,
       searchEngineId: engineId,
       themeColor,
       themeMode,
@@ -118,6 +132,50 @@ export default function SettingsPage({
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
+
+  const saveRelayLink = () => {
+    const url = relay.trim();
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "wss:") return;
+      const existing = savedRelays.find((item) => item.url === url);
+      const entry = {
+        id: existing?.id ?? `relay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: relayName.trim() || parsed.hostname,
+        url,
+        addedAt: existing?.addedAt ?? Date.now(),
+      };
+      const next = existing
+        ? savedRelays.map((item) => item.id === existing.id ? entry : item)
+        : [entry, ...savedRelays];
+      setSavedRelays(next);
+      localStorage.setItem("kara-saved-relays", JSON.stringify(next));
+      setRelayName("");
+    } catch {
+      return;
+    }
+  };
+
+  const useSavedRelay = (url: string) => {
+    setRelay(url);
+    onSave({ ...settings, relay: url, relayToken: DEFAULT_RELAY_TOKEN });
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  };
+
+  const deleteSavedRelay = (id: string) => {
+    const next = savedRelays.filter((item) => item.id !== id);
+    setSavedRelays(next);
+    localStorage.setItem("kara-saved-relays", JSON.stringify(next));
+  };
+
+  const canSaveRelay = (() => {
+    try {
+      return new URL(relay.trim()).protocol === "wss:";
+    } catch {
+      return false;
+    }
+  })();
 
   const validEngine =
     newEngineName.trim().length > 0 &&
@@ -170,18 +228,17 @@ export default function SettingsPage({
           {tab === "relay" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Relay endpoint</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Wisp WebSocket endpoint</label>
                 <input
                   type="text"
                   value={relay}
                   onChange={(e) => setRelay(e.target.value)}
-                  placeholder="https://your-relay.workers.dev"
+                  placeholder="wss://your-relay.example/wisp/"
                   spellCheck={false}
                   className="input font-mono"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
-                  The URL of your Cloudflare Worker relay. The default is a shared demo relay that
-                  may be rate-limited — deploy your own for reliable browsing.
+                  Enter the secure WebSocket URL of your Wisp relay. Use the endpoint provided by your host, usually ending in /wisp/.
                 </p>
               </div>
               <div className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
@@ -194,26 +251,99 @@ export default function SettingsPage({
                 />
                 <label htmlFor="block-trackers" className="cursor-pointer">
                   <span className="block text-sm font-medium text-[var(--text-primary)]">Block ads and trackers</span>
-                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Blocks the tracker domains listed by your relay. Off by default because some sites depend on these services for images, video, maps, games, or sign-in.</span>
+                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Filters the built-in tracker list and your custom blocked domains inside Scramjet before those requests reach the relay.</span>
                 </label>
               </div>
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
-                <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || DEFAULT_RELAY}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">Default: <code>{DEFAULT_RELAY}</code></p>
+                <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">Default: no shared relay is preconfigured. Add your Wisp endpoint.</p>
+              </div>
+              <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                    <Server size={14} className="text-[var(--accent)]" />Saved relay links
+                  </h3>
+                  <span className="text-xs text-[var(--text-faint)]">{savedRelays.length} saved</span>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  Kara probes each relay's /health endpoint to wake sleeping hosts, then tries saved relays in order if one stays unavailable. Hosts must expose the Kara Wisp health endpoint and allow cross-origin health checks.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-2">
+                  <input
+                    type="text"
+                    value={relayName}
+                    onChange={(e) => setRelayName(e.target.value)}
+                    placeholder="Name (e.g. Blitz)"
+                    className="input"
+                  />
+                  <input
+                    type="text"
+                    value={relay}
+                    readOnly
+                    aria-label="Endpoint to save"
+                    className="input font-mono opacity-75"
+                  />
+                  <button
+                    onClick={saveRelayLink}
+                    disabled={!canSaveRelay}
+                    className="btn-primary disabled:opacity-40"
+                    title="Save the endpoint above"
+                  >
+                    <Plus size={15} /> Save link
+                  </button>
+                </div>
+                {savedRelays.length === 0 ? (
+                  <p className="text-xs text-[var(--text-faint)] rounded-lg border border-dashed p-3 text-center" style={{ borderColor: "var(--border-primary)" }}>
+                    No saved relays yet. Enter a WSS endpoint above, then save it here.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {savedRelays.map((item) => (
+                      <div key={item.id} className="rounded-lg border p-3 flex flex-col sm:flex-row sm:items-center gap-2" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elev)" }}>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{item.name}</span>
+                            {relay.trim() === item.url && <span className="text-[10px] rounded-full px-2 py-0.5" style={{ color: "var(--accent-bright)", background: "var(--accent-glow)" }}>Selected</span>}
+                          </div>
+                          <p className="text-xs font-mono text-[var(--text-muted)] break-all mt-1">{item.url}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => useSavedRelay(item.url)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition"
+                            style={{ borderColor: "var(--accent-soft)", color: "var(--accent-bright)" }}
+                          >
+                            <Check size={13} /> Use
+                          </button>
+                          <button
+                            onClick={() => deleteSavedRelay(item.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition hover:text-red-400"
+                            style={{ borderColor: "var(--border-primary)", color: "var(--text-muted)" }}
+                            aria-label={`Delete ${item.name}`}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Saved on this browser and this Kara website only. It won't automatically sync to another device. Wake-up attempts cannot override a host's sleep policy, and fallback only uses relays saved here.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                  <ExternalLink size={14} className="text-[var(--accent)]" />Deploy your own relay — free, no card
+                  <ExternalLink size={14} className="text-[var(--accent)]" />Deploy a portable Wisp relay
                 </h3>
                 <ol className="space-y-2 text-xs text-[var(--text-secondary)] leading-relaxed list-decimal list-inside">
-                  <li>Go to <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer noopener" className="text-[var(--accent-bright)] hover:opacity-80 inline-flex items-center gap-0.5">dash.cloudflare.com <ExternalLink size={10} /></a> and sign up (free, no credit card).</li>
-                  <li>Sidebar: <span className="text-[var(--text-primary)]">Workers &amp; Pages → Create Worker</span>.</li>
-                  <li>Name it and click <span className="text-[var(--text-primary)]">Deploy</span>, then click <span className="text-[var(--text-primary)]">Edit code</span>.</li>
-                  <li>Paste the contents of <code className="text-[var(--accent-bright)]">worker/worker.js</code> from this project, then click <span className="text-[var(--text-primary)]">Deploy</span>.</li>
-                  <li>Copy the <code className="text-[var(--accent-bright)]">*.workers.dev</code> URL into the field above.</li>
+                  <li>Deploy this repository on any host that supports Docker or Node.js 22 and persistent WebSocket connections. The root <code className="text-[var(--accent-bright)]">Dockerfile</code> is the universal deployment entrypoint.</li>
+                  <li>Keep <code className="text-[var(--accent-bright)]">render.yaml</code> for the existing Render deployment. The existing Railway configuration is also retained.</li>
+                  <li>Set <code className="text-[var(--accent-bright)]">ALLOWED_ORIGINS</code> to your exact Kara website origin.</li>
+                  <li><code className="text-[var(--accent-bright)]">WISP_TOKEN</code> is optional. Kara's current setup does not send a token.</li>
+                  <li>Copy the host's HTTPS address, change it to <code className="text-[var(--accent-bright)]">wss://</code>, and append <code className="text-[var(--accent-bright)]">/wisp/</code>.</li>
+                  <li>Paste the endpoint above and save.</li>
                 </ol>
-                <p className="text-xs text-[var(--text-faint)] leading-relaxed">Free plan: 100,000 requests/day.</p>
+                <p className="text-xs text-[var(--text-faint)] leading-relaxed">The frontend stays static. The relay is provider-independent; the host only needs to support HTTPS and long-lived WebSocket upgrades. See <code className="text-[var(--accent-bright)]">relay/README.md</code> for deployment settings.</p>
               </div>
             </div>
           )}

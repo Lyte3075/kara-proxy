@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import {
   DEFAULT_RELAY,
+  DEFAULT_RELAY_TOKEN,
   DEFAULT_SEARCH_ENGINE_ID,
   DEFAULT_THEME_COLOR,
   DEFAULT_THEME_MODE,
@@ -46,7 +47,8 @@ export function loadSettings(): Settings {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Settings>;
       return {
-        relay: p.relay || DEFAULT_RELAY,
+        relay: (() => { const last = localStorage.getItem("kara-last-relay"); if (last && (last.startsWith("ws://") || last.startsWith("wss://"))) return last; return typeof p.relay === "string" && (p.relay.startsWith("ws://") || p.relay.startsWith("wss://")) ? p.relay : DEFAULT_RELAY; })(),
+        relayToken: typeof p.relayToken === "string" ? p.relayToken : DEFAULT_RELAY_TOKEN,
         searchEngineId: p.searchEngineId || DEFAULT_SEARCH_ENGINE_ID,
         themeColor: p.themeColor || DEFAULT_THEME_COLOR,
         themeMode: p.themeMode || DEFAULT_THEME_MODE,
@@ -55,11 +57,11 @@ export function loadSettings(): Settings {
       };
     }
   } catch {}
-  return { relay: DEFAULT_RELAY, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS };
+  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS };
 }
 
 export function saveSettings(settings: Settings): void {
-  try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)); } catch {}
+  try { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)); if (settings.relay) localStorage.setItem("kara-last-relay", settings.relay); } catch {}
 }
 
 /* ---------- shortcuts ---------- */
