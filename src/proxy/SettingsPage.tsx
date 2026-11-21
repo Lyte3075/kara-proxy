@@ -266,7 +266,7 @@ export default function SettingsPage({
                   <span className="text-xs text-[var(--text-faint)]">{savedRelays.length} saved</span>
                 </div>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  Keep Wisp endpoints here and switch between hosts whenever one goes to sleep or becomes unavailable.
+                  Kara probes each relay's /health endpoint to wake sleeping hosts, then tries saved relays in order if one stays unavailable. Hosts must expose the Kara Wisp health endpoint and allow cross-origin health checks.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-2">
                   <input
@@ -328,7 +328,7 @@ export default function SettingsPage({
                     ))}
                   </div>
                 )}
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Saved on this browser and this Kara website only. It won't automatically sync to another device.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Saved on this browser and this Kara website only. It won't automatically sync to another device. Wake-up attempts cannot override a host's sleep policy, and fallback only uses relays saved here.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
