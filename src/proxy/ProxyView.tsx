@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Loader2, Home, Globe } from "lucide-react";
+import { AlertTriangle, Loader2, Home, Globe, RefreshCw } from "lucide-react";
 import type { Frame } from "@mercuryworkshop/scramjet-controller";
 import {
   createKaraFrame,
@@ -19,6 +19,7 @@ interface ProxyViewProps {
   onLoad: () => void;
   onError: (message: string) => void;
   onHome: () => void;
+  onRelayChange: (endpoint: string) => void;
   autofillPayload: { username: string; password: string; nonce: number } | null;
 }
 
@@ -34,6 +35,7 @@ export default function ProxyView({
   onLoad,
   onError,
   onHome,
+  onRelayChange,
   autofillPayload,
 }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -44,6 +46,7 @@ export default function ProxyView({
   });
   const latestUrlRef = useRef(iframeUrl);
   const [slowLoad, setSlowLoad] = useState(false);
+  const [relayStatus, setRelayStatus] = useState("");
 
   filterConfigRef.current = { enabled: blockTrackers, blockedDomains };
   latestUrlRef.current = iframeUrl;
@@ -68,27 +71,78 @@ export default function ProxyView({
       }
 
       try {
-        const controller = await getScramjetController(relay, relayToken);
-        if (cancelled || !iframeRef.current) return;
+      const readSavedRelays = (): Array<{ name: string; url: string }> => {
+        try {
+          const stored = JSON.parse(localStorage.getItem("kara-saved-relays") || "[]");
+          if (!Array.isArray(stored)) return [];
+          return stored.filter((item) => item && typeof item.url === "string" && item.url.startsWith("wss://"));
+        } catch { return []; }
+      };
 
-        if (!frameRef.current) {
-          frameRef.current = createKaraFrame(
-            controller,
-            iframeRef.current,
-            () => filterConfigRef.current
-          );
+      const wakeRelay = async (endpoint: string): Promise<void> => {
+        const health = new URL(endpoint);
+        health.protocol = "https:";
+        health.pathname = "/health";
+        health.search = "";
+        health.hash = "";
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
+          if (cancelled) throw new Error("Relay check cancelled.");
+          setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/4)");
+          const abort = new AbortController();
+          const timeout = window.setTimeout(() => abort.abort(), 7000);
+          try {
+            const response = await fetch(health.toString(), { method: "GET", cache: "no-store", mode: "cors", credentials: "omit", signal: abort.signal });
+            if (!response.ok) throw new Error("Relay health check returned HTTP " + response.status + ".");
+            const data = await response.json();
+            if (data?.ok !== true || data?.protocol !== "wisp") throw new Error("This host did not return a valid Kara Wisp health response.");
+            return;
+          } catch (cause) { lastError = cause; }
+          finally { window.clearTimeout(timeout); }
+          if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, 2500));
         }
+        throw lastError instanceof Error ? lastError : new Error("Relay did not wake up in time.");
+      };
 
-        const latestUrl = latestUrlRef.current;
-        if (!latestUrl) return;
-        const latest = new URL(latestUrl);
-        if (latest.origin === window.location.origin) {
-          iframeRef.current.src = latest.href;
-        } else {
-          frameRef.current.go(latest.href);
+      const saved = readSavedRelays();
+      const candidates = [{ name: "Current relay", url: relay.trim() }, ...saved].filter((item, index, all) =>
+        item.url && all.findIndex((candidate) => candidate.url === item.url) === index
+      );
+      let connectedController: Awaited<ReturnType<typeof getScramjetController>> | null = null;
+      let lastError: unknown;
+      for (let index = 0; index < candidates.length; index += 1) {
+        const candidate = candidates[index];
+        try {
+          await wakeRelay(candidate.url);
+          if (cancelled) return;
+          setRelayStatus("Relay awake. Connecting…");
+          connectedController = await getScramjetController(candidate.url, relayToken);
+          if (index > 0) {
+            setRelayStatus("Switched to backup: " + candidate.name);
+            onRelayChange(candidate.url);
+          }
+          break;
+        } catch (cause) {
+          lastError = cause;
+          if (index < candidates.length - 1) setRelayStatus(candidate.name + " unavailable. Trying next relay…");
         }
+      }
+      if (!connectedController) throw lastError instanceof Error
+        ? new Error("No saved Wisp relay could be reached. Last error: " + lastError.message)
+        : new Error("No reachable Wisp relay is saved. Add another WSS endpoint in Settings.");
+      if (cancelled || !iframeRef.current) return;
+      if (!frameRef.current) {
+        frameRef.current = createKaraFrame(connectedController, iframeRef.current, () => filterConfigRef.current);
+      }
+      const latestUrl = latestUrlRef.current;
+      if (!latestUrl) return;
+      const latest = new URL(latestUrl);
+      if (latest.origin === window.location.origin) iframeRef.current.src = latest.href;
+      else frameRef.current.go(latest.href);
+      setRelayStatus("");
       } catch (cause) {
         if (!cancelled) {
+          setRelayStatus("");
           onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
         }
       }
@@ -98,7 +152,7 @@ export default function ProxyView({
     return () => {
       cancelled = true;
     };
-  }, [iframeUrl, relay, relayToken, onError]);
+  }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
 
   useEffect(() => {
     setSlowLoad(false);
@@ -156,7 +210,8 @@ export default function ProxyView({
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none" style={{ background: "var(--bg-base)" }}>
           <div className="text-center">
             <Loader2 size={28} className="text-[var(--accent)] animate-spin mx-auto" />
-            {slowLoad && <p className="mt-3 text-xs text-[var(--text-muted)]">Still loading. The site or relay may be slow.</p>}
+            {relayStatus && <p className="mt-3 text-xs text-[var(--text-muted)] flex items-center justify-center gap-1.5"><RefreshCw size={12} className="animate-spin" />{relayStatus}</p>}
+            {slowLoad && !relayStatus && <p className="mt-3 text-xs text-[var(--text-muted)]">Still loading. The site or relay may be slow.</p>}
           </div>
         </div>
       )}
