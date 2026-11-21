@@ -53,9 +53,12 @@ WISP_TOKEN="replace-with-your-generated-token" npm start
 
 ## Deploy
 
-- **Railway:** use the repository root and the included `relay/railway.json`.
-- **Render:** create a Blueprint from the included `relay/render.yaml`; enter `WISP_TOKEN` and optionally `ALLOWED_ORIGINS` when prompted.
-- **Docker/VPS:** use the included Dockerfile on any host that supports persistent Node containers and WebSockets.
+The deployment descriptors live in the repository root so providers can
+discover them without custom paths:
+
+- **Railway:** use the root `railway.json`; it builds `relay/Dockerfile`.
+- **Render:** create a Blueprint from the root `render.yaml`; enter `WISP_TOKEN` and optionally `ALLOWED_ORIGINS` when prompted.
+- **Docker/VPS:** build with the Docker command above on any host that supports persistent Node containers and WebSockets.
 
 The frontend can remain on GitHub Pages or another static host. Only this relay
 needs a WebSocket-capable application host. Cloudflare Pages can still host the
