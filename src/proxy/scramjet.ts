@@ -129,10 +129,11 @@ export async function getScramjetController(
 
   if (!controllerPromise) {
     const pending = initializeController(wispUrl);
-    controllerPromise = pending.catch((error) => {
-      if (controllerPromise === pending) controllerPromise = null;
+    const wrapped = pending.catch((error) => {
+      if (controllerPromise === wrapped) controllerPromise = null;
       throw error;
     });
+    controllerPromise = wrapped;
     activeWispUrl = wispUrl;
   }
 
