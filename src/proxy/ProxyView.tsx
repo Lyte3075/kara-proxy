@@ -90,7 +90,7 @@ export default function ProxyView({
           if (cancelled) throw new Error("Relay check cancelled.");
           setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/10)");
           const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), 7000);
+          const timeout = window.setTimeout(() => abort.abort(), 15000);
           try {
             const response = await fetch(health.toString(), { method: "GET", cache: "no-store", mode: "cors", credentials: "omit", signal: abort.signal });
             if (!response.ok) throw new Error("Relay health check returned HTTP " + response.status + ".");
