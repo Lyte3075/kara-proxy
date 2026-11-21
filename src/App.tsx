@@ -106,6 +106,7 @@ function App() {
   const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
+  const handleRelayChange = useCallback((endpoint: string) => setSettings((current) => ({ ...current, relay: endpoint })), []);
   const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
 
@@ -218,6 +219,7 @@ function App() {
         onLoad={handleLoad}
         onError={handleProxyError}
         onHome={handleHome}
+        onRelayChange={handleRelayChange}
         autofillPayload={autofillPayload}
       />
 
