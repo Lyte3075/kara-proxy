@@ -4,10 +4,10 @@ ENV NODE_ENV=production
 ENV PORT=8080
 WORKDIR /app
 
-COPY package.json ./
+COPY relay/package.json ./
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
-COPY --chown=node:node server.js ./
+COPY relay/server.js ./
 
 USER node
 EXPOSE 8080
