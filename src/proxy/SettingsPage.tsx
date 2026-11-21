@@ -55,7 +55,7 @@ interface SettingsPageProps {
 type Tab = "relay" | "search" | "appearance" | "stats" | "data" | "vault";
 
 const BUILT_IN_RELAYS = [
-  { id: "kara-prod-page", name: "Kara Default (.prod.page) · 1.5 GB RAM", url: "wss://kara.prod.page/", addedAt: 0 },
+  { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/", addedAt: 0 },
   { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/", addedAt: 0 },
 ];
 
@@ -92,7 +92,10 @@ export default function SettingsPage({
       const existing = Array.isArray(stored)
         ? stored.filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && typeof item.url === "string")
         : [];
-      const merged = [...BUILT_IN_RELAYS, ...existing.filter((item) => !BUILT_IN_RELAYS.some((builtin) => builtin.url === item.url))];
+      const migrated = existing.map((item) => item.url === "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
+        ? { ...item, id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/" }
+        : item);
+      const merged = [...BUILT_IN_RELAYS, ...migrated.filter((item) => !BUILT_IN_RELAYS.some((builtin) => builtin.url === item.url))];
       localStorage.setItem("kara-saved-relays", JSON.stringify(merged));
       return merged;
     } catch {
