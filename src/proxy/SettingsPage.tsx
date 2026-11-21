@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   Server,
@@ -78,6 +78,7 @@ export default function SettingsPage({
   onSelectPalette,
 }: SettingsPageProps) {
   const [relay, setRelay] = useState(settings.relay);
+  useEffect(() => setRelay(settings.relay), [settings.relay]);
   const [relayToken, setRelayToken] = useState(settings.relayToken);
   const [relayName, setRelayName] = useState("");
   const [savedRelays, setSavedRelays] = useState<Array<{ id: string; name: string; url: string; addedAt: number }>>(() => {
