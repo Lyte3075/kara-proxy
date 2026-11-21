@@ -70,6 +70,7 @@ export default function ProxyView({
         return;
       }
 
+      try {
       const readSavedRelays = (): Array<{ name: string; url: string }> => {
         try {
           const stored = JSON.parse(localStorage.getItem("kara-saved-relays") || "[]");
@@ -139,14 +140,19 @@ export default function ProxyView({
       if (latest.origin === window.location.origin) iframeRef.current.src = latest.href;
       else frameRef.current.go(latest.href);
       setRelayStatus("");
-    }
+      } catch (cause) {
+        if (!cancelled) {
+          setRelayStatus("");
+          onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
+        }
+      }
     };
 
     void navigate();
     return () => {
       cancelled = true;
     };
-  }, [iframeUrl, relay, relayToken, onError]);
+  }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
 
   useEffect(() => {
     setSlowLoad(false);
