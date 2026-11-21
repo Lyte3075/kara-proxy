@@ -54,6 +54,11 @@ interface SettingsPageProps {
 
 type Tab = "relay" | "search" | "appearance" | "stats" | "data" | "vault";
 
+const BUILT_IN_RELAYS = [
+  { id: "kara-prod-page", name: "Kara Default (.prod.page) · 1.5 GB RAM", url: "wss://kara.prod.page/", addedAt: 0 },
+  { id: "kara-render", name: "Kara Render Relay", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/", addedAt: 0 },
+];
+
 export default function SettingsPage({
   open,
   settings,
@@ -84,11 +89,14 @@ export default function SettingsPage({
   const [savedRelays, setSavedRelays] = useState<Array<{ id: string; name: string; url: string; addedAt: number }>>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem("kara-saved-relays") || "[]");
-      return Array.isArray(stored)
+      const existing = Array.isArray(stored)
         ? stored.filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && typeof item.url === "string")
         : [];
+      const merged = [...BUILT_IN_RELAYS, ...existing.filter((item) => !BUILT_IN_RELAYS.some((builtin) => builtin.url === item.url))];
+      localStorage.setItem("kara-saved-relays", JSON.stringify(merged));
+      return merged;
     } catch {
-      return [];
+      return BUILT_IN_RELAYS;
     }
   });
   const [engineId, setEngineId] = useState(settings.searchEngineId);
@@ -257,7 +265,7 @@ export default function SettingsPage({
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
                 <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">Default: no shared relay is preconfigured. Add your Wisp endpoint.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">The Kara .prod.page relay is preselected for new users. The Render relay is included as a backup.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <div className="flex items-center justify-between gap-2">
@@ -295,7 +303,7 @@ export default function SettingsPage({
                 </div>
                 {savedRelays.length === 0 ? (
                   <p className="text-xs text-[var(--text-faint)] rounded-lg border border-dashed p-3 text-center" style={{ borderColor: "var(--border-primary)" }}>
-                    No saved relays yet. Enter a WSS endpoint above, then save it here.
+                    Built-in Kara relays will appear here automatically. You can add your own relay above.
                   </p>
                 ) : (
                   <div className="space-y-2">
