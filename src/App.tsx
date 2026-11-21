@@ -13,8 +13,9 @@ import type {
   HistoryEntry, Settings, Shortcut, Bookmark, BrowserTab, VaultEntry,
   EncryptedVault, BackupFile, SearchEngine, ProxyStats, CustomPalette, SpeedTestResult,
 } from "@/proxy/types";
+import { TRACKER_DOMAINS } from "@/proxy/types";
 import {
-  buildProxiedUrl, buildSearchUrl, createTab, getSearchEngine,
+  buildSearchUrl, createTab, getSearchEngine,
   loadBookmarks, loadCustomEngines, loadEncryptedVault, loadHistory, loadSettings,
   loadShortcuts, loadStats, loadCustomPalettes, loadSpeedTests,
   normalizeInput, recordBlocked, recordRequest,
@@ -92,20 +93,19 @@ function App() {
     if (!tab) return;
     const normalized = normalizeInput(rawTarget);
     const finalTarget = normalized ?? buildSearchUrl(searchEngine, rawTarget.trim());
-    let url: string;
-    try { const dest = new URL(finalTarget); url = dest.origin === window.location.origin ? finalTarget : buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); } catch { url = buildProxiedUrl(settings.relay, finalTarget, settings.blockTrackers); }
     const newHistory = tab.navIdx < tab.history.length - 1 ? tab.history.slice(0, tab.navIdx + 1) : [...tab.history];
     newHistory.push(finalTarget);
-    updateTab(tabId, { url: finalTarget, iframeUrl: url, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
+    updateTab(tabId, { url: finalTarget, iframeUrl: finalTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
     if (tabId === activeTabId) setInput(finalTarget);
     setStatsOpen(false); setHistoryOpen(false);
     setHistory((prev) => { const entry: HistoryEntry = { url: finalTarget, displayUrl: finalTarget.replace(/^https?:\/\//, ""), title: finalTarget.replace(/^https?:\/\//, ""), ts: Date.now() }; return [entry, ...prev.filter((h) => h.url !== finalTarget)].slice(0, 100); });
-  }, [tabs, activeTabId, settings.relay, settings.blockTrackers, searchEngine, updateTab]);
+  }, [tabs, activeTabId, searchEngine, updateTab]);
 
-  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null }); setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
-  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: buildProxiedUrl(settings.relay, t, settings.blockTrackers), loading: true, error: null }); setInput(t); }, [activeTab, settings.relay, settings.blockTrackers, updateActiveTab]);
+  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
+  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
   const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
+  const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
   const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
 
@@ -161,7 +161,8 @@ function App() {
   const handleAutofill = useCallback((e: VaultEntry) => { setAutofillPayload({ username: e.username, password: e.password, nonce: Date.now() }); setVaultOpen(false); }, []);
 
   /* ---------- derived ---------- */
-  const proxied = activeTab.iframeUrl ? activeTab.iframeUrl.includes("/proxy?") : false;
+  const proxied = activeTab.iframeUrl ? (() => { try { return new URL(activeTab.iframeUrl).origin !== window.location.origin; } catch { return true; } })() : false;
+  const blockedDomains = [...TRACKER_DOMAINS.filter((domain) => !stats.allowedDomains.includes(domain)), ...stats.customBlocklist];
   const canGoBack = activeTab.navIdx > 0;
   const canGoForward = activeTab.navIdx < activeTab.history.length - 1;
   const showStartPage = !activeTab.iframeUrl && !activeTab.error && !statsOpen;
@@ -203,9 +204,22 @@ function App() {
         <StatsDashboard stats={stats} history={history} relay={settings.relay} speedTests={speedTests} onSpeedTest={handleSpeedTest} onAddBlockedDomain={addBlockedDomain} onRemoveBlockedDomain={removeBlockedDomain} onAllowDomain={allowDomain} onRemoveAllowed={removeAllowed} onClose={() => setStatsOpen(false)} />
       ) : historyOpen ? (
         <HistoryPanel open={historyOpen} history={history} onOpen={openHistoryEntry} onRemove={removeHistoryEntry} onClear={clearHistory} onClose={() => setHistoryOpen(false)} />
-      ) : (
-        <ProxyView iframeUrl={activeTab.iframeUrl} loading={activeTab.loading} error={activeTab.error} onLoad={handleLoad} onHome={handleHome} autofillPayload={autofillPayload} />
-      )}
+      ) : null}
+
+      <ProxyView
+        iframeUrl={activeTab.iframeUrl}
+        relay={settings.relay}
+        relayToken={settings.relayToken}
+        blockTrackers={settings.blockTrackers}
+        blockedDomains={blockedDomains}
+        loading={activeTab.loading}
+        error={activeTab.error}
+        hidden={showStartPage || statsOpen || historyOpen}
+        onLoad={handleLoad}
+        onError={handleProxyError}
+        onHome={handleHome}
+        autofillPayload={autofillPayload}
+      />
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}

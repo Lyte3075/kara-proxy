@@ -41,10 +41,12 @@ export default function StatsDashboard({
     setTesting(true);
     setTestPhase("Measuring latency...");
     try {
-      const base = relay.replace(/\/+$/, "");
-      // Latency test
+      const relayUrl = new URL(relay);
+      const base = `${relayUrl.protocol === "wss:" ? "https:" : "http:"}//${relayUrl.host}`;
+      // Measure the relay host's HTTP health endpoint.
       const t0 = performance.now();
-      await fetch(`${base}/health`, { cache: "no-store" });
+      const health = await fetch(`${base}/health`, { cache: "no-store" });
+      if (!health.ok) throw new Error("Relay health check failed.");
       const latency = Math.round(performance.now() - t0);
 
       setTestPhase("Downloading test data...");
