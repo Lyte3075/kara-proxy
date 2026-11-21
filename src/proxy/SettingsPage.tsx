@@ -19,7 +19,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import type { Settings, BackupFile, EncryptedVault, HistoryEntry, Bookmark, SearchEngine, ProxyStats, ThemeColor, ThemeMode, CustomPalette } from "@/proxy/types";
-import { DEFAULT_RELAY, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
+import { DEFAULT_RELAY, DEFAULT_RELAY_TOKEN, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
 import {
   buildBackupFile,
   downloadBackupFile,
@@ -78,6 +78,7 @@ export default function SettingsPage({
   onSelectPalette,
 }: SettingsPageProps) {
   const [relay, setRelay] = useState(settings.relay);
+  const [relayToken, setRelayToken] = useState(settings.relayToken);
   const [engineId, setEngineId] = useState(settings.searchEngineId);
   const [themeColor, setThemeColor] = useState<ThemeColor>(settings.themeColor);
   const [themeMode, setThemeMode] = useState<ThemeMode>(settings.themeMode);
@@ -108,7 +109,8 @@ export default function SettingsPage({
 
   const handleSave = () => {
     onSave({
-      relay: relay.trim().replace(/\/+$/, "") || DEFAULT_RELAY,
+      relay: relay.trim() || DEFAULT_RELAY,
+      relayToken: DEFAULT_RELAY_TOKEN,
       searchEngineId: engineId,
       themeColor,
       themeMode,
@@ -170,18 +172,17 @@ export default function SettingsPage({
           {tab === "relay" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Relay endpoint</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Wisp WebSocket endpoint</label>
                 <input
                   type="text"
                   value={relay}
                   onChange={(e) => setRelay(e.target.value)}
-                  placeholder="https://your-relay.workers.dev"
+                  placeholder="wss://your-relay.example/wisp/"
                   spellCheck={false}
                   className="input font-mono"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">
-                  The URL of your Cloudflare Worker relay. The default is a shared demo relay that
-                  may be rate-limited — deploy your own for reliable browsing.
+                  Enter the secure WebSocket URL of your Wisp relay. Use the endpoint provided by your host, usually ending in /wisp/.
                 </p>
               </div>
               <div className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
@@ -194,26 +195,26 @@ export default function SettingsPage({
                 />
                 <label htmlFor="block-trackers" className="cursor-pointer">
                   <span className="block text-sm font-medium text-[var(--text-primary)]">Block ads and trackers</span>
-                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Blocks the tracker domains listed by your relay. Off by default because some sites depend on these services for images, video, maps, games, or sign-in.</span>
+                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Filters the built-in tracker list and your custom blocked domains inside Scramjet before those requests reach the relay.</span>
                 </label>
               </div>
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
-                <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || DEFAULT_RELAY}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">Default: <code>{DEFAULT_RELAY}</code></p>
+                <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">Default: no shared relay is preconfigured. Add your Wisp endpoint.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                  <ExternalLink size={14} className="text-[var(--accent)]" />Deploy your own relay — free, no card
+                  <ExternalLink size={14} className="text-[var(--accent)]" />Deploy a portable Wisp relay
                 </h3>
                 <ol className="space-y-2 text-xs text-[var(--text-secondary)] leading-relaxed list-decimal list-inside">
-                  <li>Go to <a href="https://dash.cloudflare.com" target="_blank" rel="noreferrer noopener" className="text-[var(--accent-bright)] hover:opacity-80 inline-flex items-center gap-0.5">dash.cloudflare.com <ExternalLink size={10} /></a> and sign up (free, no credit card).</li>
-                  <li>Sidebar: <span className="text-[var(--text-primary)]">Workers &amp; Pages → Create Worker</span>.</li>
-                  <li>Name it and click <span className="text-[var(--text-primary)]">Deploy</span>, then click <span className="text-[var(--text-primary)]">Edit code</span>.</li>
-                  <li>Paste the contents of <code className="text-[var(--accent-bright)]">worker/worker.js</code> from this project, then click <span className="text-[var(--text-primary)]">Deploy</span>.</li>
-                  <li>Copy the <code className="text-[var(--accent-bright)]">*.workers.dev</code> URL into the field above.</li>
+                  <li>Deploy this repository using its root <code className="text-[var(--accent-bright)]">railway.json</code> or <code className="text-[var(--accent-bright)]">render.yaml</code>, or build <code className="text-[var(--accent-bright)]">relay/Dockerfile</code> on any Docker host.</li>
+                  <li>No WISP_TOKEN is required. Leave it unset on Render.</li>
+                  <li>Set <code className="text-[var(--accent-bright)]">ALLOWED_ORIGINS</code> to your exact Kara website origin.</li>
+                  <li>Copy the host's HTTPS address, change it to <code className="text-[var(--accent-bright)]">wss://</code>, and append <code className="text-[var(--accent-bright)]">/wisp/</code>.</li>
+                  <li>Paste the endpoint above and save.</li>
                 </ol>
-                <p className="text-xs text-[var(--text-faint)] leading-relaxed">Free plan: 100,000 requests/day.</p>
+                <p className="text-xs text-[var(--text-faint)] leading-relaxed">The frontend stays static and can remain on GitHub Pages. The relay host must support persistent WebSocket connections.</p>
               </div>
             </div>
           )}

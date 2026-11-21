@@ -50,7 +50,10 @@ export interface CustomPalette {
 }
 
 export interface Settings {
+  /** Wisp WebSocket endpoint, e.g. wss://relay.example/wisp/ */
   relay: string;
+  /** Access token configured on the selected Wisp relay */
+  relayToken: string;
   searchEngineId: string;
   themeColor: ThemeColor;
   themeMode: ThemeMode;
@@ -59,7 +62,8 @@ export interface Settings {
   blockTrackers: boolean;
 }
 
-export const DEFAULT_RELAY = "https://kara.lyte3075.workers.dev";
+export const DEFAULT_RELAY = "";
+export const DEFAULT_RELAY_TOKEN = "";
 export const DEFAULT_SEARCH_ENGINE_ID = "duckduckgo";
 export const DEFAULT_THEME_COLOR: ThemeColor = "red";
 export const DEFAULT_THEME_MODE: ThemeMode = "dark";
