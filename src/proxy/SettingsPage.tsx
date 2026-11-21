@@ -55,8 +55,8 @@ interface SettingsPageProps {
 type Tab = "relay" | "search" | "appearance" | "stats" | "data" | "vault";
 
 const BUILT_IN_RELAYS = [
-  { id: "kara-prod-page", name: "Kara Default (.prod.page) · 1.5 GB RAM", url: "wss://kara.prod.page/", addedAt: 0 },
-  { id: "kara-render", name: "Kara Render Relay", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/", addedAt: 0 },
+  { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/", addedAt: 0 },
+  { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/", addedAt: 0 },
 ];
 
 export default function SettingsPage({
@@ -92,7 +92,10 @@ export default function SettingsPage({
       const existing = Array.isArray(stored)
         ? stored.filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && typeof item.url === "string")
         : [];
-      const merged = [...BUILT_IN_RELAYS, ...existing.filter((item) => !BUILT_IN_RELAYS.some((builtin) => builtin.url === item.url))];
+      const migrated = existing.map((item) => item.url === "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
+        ? { ...item, id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/" }
+        : item);
+      const merged = [...BUILT_IN_RELAYS, ...migrated.filter((item) => !BUILT_IN_RELAYS.some((builtin) => builtin.url === item.url))];
       localStorage.setItem("kara-saved-relays", JSON.stringify(merged));
       return merged;
     } catch {
@@ -265,7 +268,7 @@ export default function SettingsPage({
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
                 <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">The Kara .prod.page relay is preselected for new users. The Render relay is included as a backup.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">The Kara .prod.page relay is preselected for new users. Kara Proxy Wisp on Render is included as a backup.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <div className="flex items-center justify-between gap-2">

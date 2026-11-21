@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: kara-wisp-relay
+    name: kara-proxy-wisp
     runtime: docker
     dockerfilePath: ./relay/Dockerfile
     dockerContext: .
