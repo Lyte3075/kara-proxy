@@ -13,9 +13,6 @@ const maxSpeedTestBytes = 1024 * 1024;
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid TCP port.");
 }
-if (token.length < 32) {
-  throw new Error("Set WISP_TOKEN to a random value at least 32 characters long.");
-}
 
 logging.set_level(logging.INFO);
 
@@ -27,7 +24,7 @@ wisp.options.stream_limit_per_host = 8;
 wisp.options.stream_limit_total = 128;
 
 function originAllowed(origin) {
-  return allowedOrigins.length === 0 || (origin && allowedOrigins.includes(origin));
+  return allowedOrigins.length === 0 || allowedOrigins.includes(origin);
 }
 
 function corsHeaders(origin) {
@@ -49,6 +46,7 @@ function sendJson(response, status, body, origin) {
 }
 
 function tokenMatches(candidate) {
+  if (!token) return true;
   if (typeof candidate !== "string") return false;
   const expected = Buffer.from(token);
   const supplied = Buffer.from(candidate);
@@ -59,7 +57,7 @@ const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", "http://localhost");
   const origin = request.headers.origin || "";
 
-  if (origin && !originAllowed(origin)) {
+  if (!originAllowed(origin)) {
     sendJson(response, 403, { ok: false, error: "Origin not allowed" }, "null");
     return;
   }
