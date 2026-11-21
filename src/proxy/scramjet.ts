@@ -75,10 +75,8 @@ export function normalizeWispEndpoint(endpoint: string, token: string): string {
   }
 
   const accessToken = token.trim();
-  if (!accessToken) {
-    throw new Error("Enter the Wisp access token configured on your relay.");
-  }
-  url.searchParams.set("token", accessToken);
+  if (accessToken) url.searchParams.set("token", accessToken);
+  else url.searchParams.delete("token");
   return url.toString();
 }
 
