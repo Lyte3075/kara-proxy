@@ -1,80 +1,70 @@
 # Kara Wisp relay
 
-This service is Kara's portable network backend. It runs the official
-`@mercuryworkshop/wisp-js` server and accepts Wisp WebSocket connections at
-`/wisp/`. It does not fetch and rewrite website HTML. Scramjet runs in the
-visitor's browser and uses this relay as its network transport.
+Kara's relay is a provider-independent Node.js 22 service using `@mercuryworkshop/wisp-js`. It accepts Scramjet Wisp WebSocket connections at `/wisp/`.
 
-## Requirements
+The frontend is static and can stay on GitHub Pages or Vercel. The relay is a separate service and can run on any host that supports Docker (recommended) or Node.js 22, persistent WebSocket upgrades, and HTTPS.
 
-- Docker, or Node.js 22+
-- A public HTTPS deployment that supports long-lived WebSocket connections
-- A random relay token of at least 32 characters
+## Universal deployment
 
-Generate a token locally:
+The repository root now contains a standard `Dockerfile`. Most container-based hosting platforms can detect it automatically when connected to this repository. No provider-specific adapter or Wisp implementation is required.
 
-```sh
-openssl rand -hex 32
-```
+Use these settings if the host asks for them:
 
-Set these environment variables in the hosting provider:
+| Setting | Value |
+| --- | --- |
+| Repository | `Lyte3075/kara-proxy` |
+| Dockerfile | `Dockerfile` (repository root) |
+| Build context | Repository root (`.`) |
+| Runtime | Node.js 22 container |
+| Port | Provider's `PORT` variable, fallback `8080` |
+| Health check | `/health` |
+| WebSocket path | `/wisp/` |
+
+Environment variables:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `PORT` | No | HTTP port. Defaults to `8080`. |
-| `WISP_TOKEN` | Yes | Shared access token for the Wisp WebSocket endpoint. |
-| `ALLOWED_ORIGINS` | No | Comma-separated exact frontend origins. Leave unset to allow any origin; the token is still required. |
+| `PORT` | Provider-dependent | Port assigned by the host. Defaults to `8080`. |
+| `ALLOWED_ORIGINS` | Recommended | Comma-separated exact Kara frontend origins, e.g. `https://your-kara-site.example`. No path or trailing slash. |
+| `WISP_TOKEN` | No | Optional shared token. Kara's current no-token configuration leaves this unset. |
 
-Do not commit the token to Git or put it in a public deployment file.
+The host must:
+- Support persistent WebSocket connections and HTTP Upgrade requests.
+- Forward WebSocket traffic without buffering or short idle timeouts.
+- Provide HTTPS/TLS, so Kara can connect with `wss://`.
+- Pass its assigned port through `PORT`.
 
-## Run with Docker
+After deployment, take the provider's HTTPS hostname, change `https://` to `wss://`, and append `/wisp/`.
 
-From the repository root:
+Example: `wss://your-service.example/wisp/`
 
-```sh
-docker build -f relay/Dockerfile -t kara-wisp .
-docker run --rm -p 8080:8080 \
-  -e WISP_TOKEN="replace-with-your-generated-token" \
-  -e ALLOWED_ORIGINS="https://your-kara-site.example" \
-  kara-wisp
-```
+Health check: `https://your-service.example/health`
 
-Health check: `http://localhost:8080/health`
+## Node.js deployment without Docker
 
-Wisp endpoint: `wss://your-relay-host.example/wisp/?token=YOUR_TOKEN`
+If a host supports a native Node.js service, configure:
 
-## Run directly with Node
+- Runtime: Node.js 22
+- Root / working directory: `relay`
+- Install command: `npm install --omit=dev`
+- Start command: `npm start`
+- Environment: `PORT` (provided by host) and `ALLOWED_ORIGINS`
 
-```sh
-cd relay
-npm install
-WISP_TOKEN="replace-with-your-generated-token" npm start
-```
+The relay listens on `0.0.0.0` and uses the assigned `PORT`.
 
-## Deploy
+## Existing provider configurations
 
-The deployment descriptors live in the repository root so providers can
-discover them without custom paths:
+These existing files are intentionally retained:
 
-- **Railway:** use the root `railway.json`; it builds `relay/Dockerfile`.
-- **Render:** create a Blueprint from the root `render.yaml`; enter `WISP_TOKEN` and optionally `ALLOWED_ORIGINS` when prompted.
-- **Docker/VPS:** build with the Docker command above on any host that supports persistent Node containers and WebSockets.
+- **Render:** root `render.yaml` continues to deploy using `relay/Dockerfile`. No change to the existing Render service is required.
+- **Railway:** root `railway.json` continues to use `relay/Dockerfile`.
+- **Portable Docker image:** root `Dockerfile` is the universal default for other platforms.
+- **Explicit relay image:** `relay/Dockerfile` remains available for providers where you want to specify the path.
 
-The frontend can remain on GitHub Pages or another static host. Only this relay
-needs a WebSocket-capable application host. Cloudflare Pages can still host the
-static frontend; a Cloudflare Worker is not the portable Wisp server target.
+The two Dockerfiles package the same relay application. The root one exists for providers that automatically look for `Dockerfile` at the repository root.
 
-## Security defaults
+## Security note
 
-The server requires a token, rejects private and loopback IP destinations,
-rejects direct-IP destinations, limits outbound streams to ports 80 and 443,
-and applies per-connection stream limits. Keep the token private and rotate it
-if it is exposed. This is a general-purpose web transport, so do not publish
-the token in source code or share it publicly.
+A public no-token relay can be abused by anyone who can reach it. `ALLOWED_ORIGINS` is useful browser-origin filtering, but the Origin header is not strong authentication because non-browser clients can forge it. Keep the relay private or add real authentication and rate limits before offering it as a public shared service.
 
-## Compatibility
-
-The browser frontend must connect to the exact WebSocket endpoint shown above.
-The Scramjet transport integration and local browser assets are added in the
-frontend migration stage. Until that stage is complete, this relay is only the
-new backend foundation and does not replace the legacy `/proxy` Worker.
+The current relay blocks private, loopback, and direct-IP destinations, restricts destination ports to 80 and 443, and limits concurrent streams. Do not expose an unprotected relay as a public service for strangers.

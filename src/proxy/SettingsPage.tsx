@@ -208,13 +208,14 @@ export default function SettingsPage({
                   <ExternalLink size={14} className="text-[var(--accent)]" />Deploy a portable Wisp relay
                 </h3>
                 <ol className="space-y-2 text-xs text-[var(--text-secondary)] leading-relaxed list-decimal list-inside">
-                  <li>Deploy this repository using its root <code className="text-[var(--accent-bright)]">railway.json</code> or <code className="text-[var(--accent-bright)]">render.yaml</code>, or build <code className="text-[var(--accent-bright)]">relay/Dockerfile</code> on any Docker host.</li>
-                  <li>No WISP_TOKEN is required. Leave it unset on Render.</li>
+                  <li>Deploy this repository on any host that supports Docker or Node.js 22 and persistent WebSocket connections. The root <code className="text-[var(--accent-bright)]">Dockerfile</code> is the universal deployment entrypoint.</li>
+                  <li>Keep <code className="text-[var(--accent-bright)]">render.yaml</code> for the existing Render deployment. The existing Railway configuration is also retained.</li>
                   <li>Set <code className="text-[var(--accent-bright)]">ALLOWED_ORIGINS</code> to your exact Kara website origin.</li>
+                  <li><code className="text-[var(--accent-bright)]">WISP_TOKEN</code> is optional. Kara's current setup does not send a token.</li>
                   <li>Copy the host's HTTPS address, change it to <code className="text-[var(--accent-bright)]">wss://</code>, and append <code className="text-[var(--accent-bright)]">/wisp/</code>.</li>
                   <li>Paste the endpoint above and save.</li>
                 </ol>
-                <p className="text-xs text-[var(--text-faint)] leading-relaxed">The frontend stays static and can remain on GitHub Pages. The relay host must support persistent WebSocket connections.</p>
+                <p className="text-xs text-[var(--text-faint)] leading-relaxed">The frontend stays static. The relay is provider-independent; the host only needs to support HTTPS and long-lived WebSocket upgrades. See <code className="text-[var(--accent-bright)]">relay/README.md</code> for deployment settings.</p>
               </div>
             </div>
           )}

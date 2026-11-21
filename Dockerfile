@@ -1,0 +1,24 @@
+# Universal Kara Wisp relay container.
+# Hosting platforms can detect this root-level Dockerfile automatically.
+# Render and Railway keep using their existing provider-specific configurations.
+
+FROM node:22-alpine
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+WORKDIR /app
+
+COPY relay/package.json ./package.json
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+
+COPY relay/server.js ./server.js
+
+USER node
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["npm", "start"]
