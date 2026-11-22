@@ -200,10 +200,9 @@ export default function SettingsPage({
       setImportMsg("Your browser blocked the new tab. Allow pop-ups for Kara and try again.");
       return;
     }
+    // Keep the popup's initial about:blank URL intact. document.open()/write()
+    // can replace its visible URL with the opener URL in some browser engines.
     const doc = popup.document;
-    doc.open();
-    doc.write("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body></body></html>");
-    doc.close();
     doc.title = tabCloakEnabled && tabCloakTitle.trim() ? tabCloakTitle.trim() : "Kara";
     const iconUrl = tabCloakEnabled ? tabCloakFavicon.trim() : "";
     if (iconUrl) {
