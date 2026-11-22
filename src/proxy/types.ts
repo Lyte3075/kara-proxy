@@ -60,6 +60,10 @@ export interface Settings {
   /** ID of a custom palette, or null */
   customPaletteId: string | null;
   blockTrackers: boolean;
+  /** Customize the browser tab's title and favicon */
+  tabCloakEnabled: boolean;
+  tabCloakTitle: string;
+  tabCloakFavicon: string;
 }
 
 export const DEFAULT_RELAY = "wss://kara.prod.page/wisp/";

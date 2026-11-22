@@ -17,6 +17,7 @@ import {
   Moon,
   Plus,
   BarChart3,
+  Eye,
 } from "lucide-react";
 import type { Settings, BackupFile, EncryptedVault, HistoryEntry, Bookmark, SearchEngine, ProxyStats, ThemeColor, ThemeMode, CustomPalette } from "@/proxy/types";
 import { DEFAULT_RELAY, DEFAULT_RELAY_TOKEN, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
@@ -38,6 +39,7 @@ interface SettingsPageProps {
   stats: ProxyStats;
   onClose: () => void;
   onSave: (settings: Settings) => void;
+  onPreviewFavicon: (faviconUrl: string) => void;
   onClearHistory: () => void;
   onClearBookmarks: () => void;
   onResetAll: () => void;
@@ -52,7 +54,7 @@ interface SettingsPageProps {
   onSelectPalette: (id: string | null) => void;
 }
 
-type Tab = "relay" | "search" | "appearance" | "stats" | "data" | "vault";
+type Tab = "relay" | "search" | "appearance" | "cloaking" | "stats" | "data" | "vault";
 
 const BUILT_IN_RELAYS = [
   { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/wisp/", addedAt: 0 },
@@ -69,6 +71,7 @@ export default function SettingsPage({
   stats,
   onClose,
   onSave,
+  onPreviewFavicon,
   onClearHistory,
   onClearBookmarks,
   onResetAll,
@@ -110,6 +113,9 @@ export default function SettingsPage({
   const [themeColor, setThemeColor] = useState<ThemeColor>(settings.themeColor);
   const [themeMode, setThemeMode] = useState<ThemeMode>(settings.themeMode);
   const [blockTrackers, setBlockTrackers] = useState(settings.blockTrackers);
+  const [tabCloakEnabled, setTabCloakEnabled] = useState(settings.tabCloakEnabled);
+  const [tabCloakTitle, setTabCloakTitle] = useState(settings.tabCloakTitle);
+  const [tabCloakFavicon, setTabCloakFavicon] = useState(settings.tabCloakFavicon);
   const [tab, setTab] = useState<Tab>("relay");
   const [saved, setSaved] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -132,6 +138,9 @@ export default function SettingsPage({
     themeColor !== settings.themeColor ||
     themeMode !== settings.themeMode ||
     blockTrackers !== settings.blockTrackers ||
+    tabCloakEnabled !== settings.tabCloakEnabled ||
+    tabCloakTitle !== settings.tabCloakTitle ||
+    tabCloakFavicon !== settings.tabCloakFavicon ||
     settings.customPaletteId !== null;
 
   const handleSave = () => {
@@ -143,6 +152,9 @@ export default function SettingsPage({
       themeMode,
       customPaletteId: settings.customPaletteId,
       blockTrackers,
+      tabCloakEnabled,
+      tabCloakTitle: tabCloakTitle.trim(),
+      tabCloakFavicon: tabCloakFavicon.trim(),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -182,6 +194,45 @@ export default function SettingsPage({
     const next = savedRelays.filter((item) => item.id !== id);
     setSavedRelays(next);
     localStorage.setItem("kara-saved-relays", JSON.stringify(next));
+  };
+
+  const openAboutBlank = () => {
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) {
+      setImportMsg("Your browser blocked the new tab. Allow pop-ups for Kara and try again.");
+      return;
+    }
+    // Keep the popup's initial about:blank URL intact. document.open()/write()
+    // can replace its visible URL with the opener URL in some browser engines.
+    const doc = popup.document;
+    doc.title = tabCloakEnabled && tabCloakTitle.trim() ? tabCloakTitle.trim() : "Kara";
+    const iconUrl = tabCloakEnabled ? tabCloakFavicon.trim() : "";
+    if (iconUrl) {
+      try {
+        const parsed = new URL(iconUrl, window.location.href);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          const icon = doc.createElement("link");
+          icon.rel = "icon";
+          icon.href = parsed.href;
+          doc.head.appendChild(icon);
+        }
+      } catch {}
+    }
+    // Give the blank document a real mobile viewport so the embedded app uses
+    // the device's CSS-pixel width instead of Safari's desktop layout viewport.
+    const viewport = doc.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width, initial-scale=1, viewport-fit=cover";
+    doc.head.appendChild(viewport);
+    doc.documentElement.style.cssText = "position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#09090b";
+    doc.body.style.cssText = "position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#09090b";
+    const frame = doc.createElement("iframe");
+    frame.title = "Kara Proxy";
+    frame.src = window.location.href;
+    frame.allow = "accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture";
+    frame.referrerPolicy = "no-referrer";
+    frame.style.cssText = "position:fixed;inset:0;display:block;width:100vw;height:100vh;height:100dvh;min-height:100%;margin:0;padding:0;border:0;background:#09090b";
+    doc.body.appendChild(frame);
   };
 
   const canSaveRelay = (() => {
@@ -233,6 +284,7 @@ export default function SettingsPage({
           <TabBtn active={tab === "relay"} onClick={() => setTab("relay")} icon={<Server size={15} />}>Relay</TabBtn>
           <TabBtn active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={15} />}>Search</TabBtn>
           <TabBtn active={tab === "appearance"} onClick={() => setTab("appearance")} icon={<Palette size={15} />}>Appearance</TabBtn>
+          <TabBtn active={tab === "cloaking"} onClick={() => setTab("cloaking")} icon={<Eye size={15} />}>Cloaking</TabBtn>
           <TabBtn active={tab === "stats"} onClick={() => setTab("stats")} icon={<BarChart3 size={15} />}>Stats</TabBtn>
           <TabBtn active={tab === "data"} onClick={() => setTab("data")} icon={<Database size={15} />}>Data</TabBtn>
           <TabBtn active={tab === "vault"} onClick={() => setTab("vault")} icon={<KeyRound size={15} />}>Vault</TabBtn>
@@ -542,6 +594,121 @@ export default function SettingsPage({
                     <span className="text-sm font-medium text-[var(--text-primary)]">Light</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "cloaking" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <div className="flex items-start gap-3">
+                  <input
+                    id="tab-cloak-enabled"
+                    type="checkbox"
+                    checked={tabCloakEnabled}
+                    onChange={(e) => setTabCloakEnabled(e.target.checked)}
+                    className="mt-1 h-4 w-4 accent-[var(--accent)]"
+                  />
+                  <label htmlFor="tab-cloak-enabled" className="cursor-pointer">
+                    <span className="block text-sm font-medium text-[var(--text-primary)]">Enable tab cloaking</span>
+                    <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Customize the title and favicon shown for the Kara tab. This changes the browser's tab appearance, not the address bar or network identity.</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">Tab title</label>
+                  <input type="text" value={tabCloakTitle} onChange={(e) => setTabCloakTitle(e.target.value)} placeholder="e.g. Google Classroom" maxLength={80} className="input" disabled={!tabCloakEnabled} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">Favicon URL</label>
+                  <input type="url" value={tabCloakFavicon} onChange={(e) => setTabCloakFavicon(e.target.value)} placeholder="https://example.com/favicon.ico" className="input font-mono" disabled={!tabCloakEnabled} />
+                  <p className="text-[11px] text-[var(--text-faint)] mt-1.5">Use a direct HTTP or HTTPS image URL. Some browsers cache favicons, so changes may not appear immediately.</p>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    { group: "Learning platforms", items: [
+                      { label: "Canvas Dashboard", title: "Canvas Dashboard", domain: "canvas.instructure.com" },
+                      { label: "ClassLink", title: "ClassLink", domain: "my.classlink.com" },
+                      { label: "Clever", title: "Clever", domain: "clever.com" },
+                      { label: "Schoology", title: "Schoology", domain: "app.schoology.com" },
+                      { label: "Blackboard", title: "Blackboard", domain: "blackboard.com" },
+                      { label: "Moodle", title: "Moodle", domain: "moodle.org" },
+                      { label: "PowerSchool", title: "PowerSchool", domain: "powerschool.com" },
+                      { label: "Infinite Campus", title: "Infinite Campus", domain: "infinitecampus.com" },
+                      { label: "Google Classroom", title: "Google Classroom", domain: "classroom.google.com" },
+                      { label: "Microsoft Teams", title: "Microsoft Teams", domain: "teams.microsoft.com" },
+                      { label: "OneNote", title: "OneNote", domain: "onenote.com" },
+                    ]},
+                    { group: "Classroom tools", items: [
+                      { label: "Seesaw", title: "Seesaw", domain: "web.seesaw.me" },
+                      { label: "Nearpod", title: "Nearpod", domain: "nearpod.com" },
+                      { label: "Kahoot!", title: "Kahoot!", domain: "kahoot.com" },
+                      { label: "Quizlet", title: "Quizlet", domain: "quizlet.com" },
+                      { label: "IXL", title: "IXL", domain: "ixl.com" },
+                      { label: "Edpuzzle", title: "Edpuzzle", domain: "edpuzzle.com" },
+                      { label: "Newsela", title: "Newsela", domain: "newsela.com" },
+                      { label: "Edmodo", title: "Edmodo", domain: "edmodo.com" },
+                    ]},
+                    { group: "Learning resources", items: [
+                      { label: "Khan Academy", title: "Khan Academy", domain: "khanacademy.org" },
+                      { label: "Duolingo", title: "Duolingo", domain: "duolingo.com" },
+                      { label: "Prodigy", title: "Prodigy", domain: "prodigygame.com" },
+                      { label: "BrainPOP", title: "BrainPOP", domain: "brainpop.com" },
+                      { label: "Discovery Education", title: "Discovery Education", domain: "discoveryeducation.com" },
+                      { label: "McGraw Hill", title: "McGraw Hill", domain: "mheducation.com" },
+                      { label: "Pearson", title: "Pearson", domain: "pearson.com" },
+                      { label: "Savvas", title: "Savvas", domain: "savvas.com" },
+                      { label: "HMH", title: "HMH", domain: "hmhco.com" },
+                    ]},
+                    { group: "Google Workspace", items: [
+                      { label: "Google Docs", title: "Google Docs", domain: "docs.google.com" },
+                      { label: "Google Drive", title: "Google Drive", domain: "drive.google.com" },
+                      { label: "Google Slides", title: "Google Slides", domain: "slides.google.com" },
+                      { label: "Google Sheets", title: "Google Sheets", domain: "sheets.google.com" },
+                    ]},
+                    { group: "Microsoft 365", items: [
+                      { label: "Microsoft Word", title: "Microsoft Word", domain: "word.cloud.microsoft" },
+                      { label: "Microsoft Excel", title: "Microsoft Excel", domain: "excel.cloud.microsoft" },
+                      { label: "Microsoft PowerPoint", title: "Microsoft PowerPoint", domain: "powerpoint.cloud.microsoft" },
+                      { label: "Microsoft Outlook", title: "Outlook", domain: "outlook.office.com" },
+                    ]},
+                  ].map((section) => (
+                    <div key={section.group}>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {section.items.map((preset) => {
+                          // ClassLink publishes its LaunchPad favicon on its own CDN.
+                          // Other presets use a domain-specific icon with the site's favicon as fallback.
+                          const icon = preset.title === "ClassLink"
+                            ? "https://cdn.classlink.com/production/launchpad/resources/images/favicon/favicon-32x32.png"
+                            : `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
+                          const fallbackIcon = preset.title === "ClassLink"
+                            ? "https://launchpad.classlink.com/favicon.ico"
+                            : `https://${preset.domain}/favicon.ico`;
+                          const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
+                          return (
+                            <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); onPreviewFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
+                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (!image.dataset.fallbackTried) { image.dataset.fallbackTried = "true"; image.src = fallbackIcon; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
+                              <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Presets use domain-specific icons. ClassLink uses its published LaunchPad CDN favicon. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
+                <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
+                  <Check size={15} /> Save cloaking settings
+                </button>
+              </div>
+
+              <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2"><Eye size={15} className="text-[var(--accent)]" />Open Kara in about:blank</h3>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">Opens a new about:blank tab containing Kara in a full-screen embedded view. The outer tab can retain your chosen title and favicon while its address remains about:blank. Browser popup and iframe policies may prevent this on some devices.</p>
+                <button type="button" onClick={openAboutBlank} className="btn-primary">
+                  <ExternalLink size={15} /> Open about:blank tab
+                </button>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">This is a launch convenience, not a security or anonymity feature. Your network requests still use the configured Wisp relay, and websites may still identify themselves within their own content.</p>
               </div>
             </div>
           )}

@@ -24,6 +24,34 @@ import {
   applyCustomPalette, uid,
 } from "@/proxy/utils";
 
+function applyTabFavicon(faviconUrl: string) {
+  let iconUrl = "/Kara.png";
+  try {
+    const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") iconUrl = parsed.href;
+  } catch {
+    iconUrl = "/Kara.png";
+  }
+
+  // A fresh URL forces the browser to request the selected icon instead of
+  // reusing a previously cached favicon for this tab.
+  const cacheBusted = new URL(iconUrl, window.location.href);
+  cacheBusted.searchParams.set("kara_icon", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const href = cacheBusted.href;
+
+  document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach((link) => link.remove());
+
+  const icon = document.createElement("link");
+  icon.rel = "icon";
+  icon.href = href;
+  document.head.appendChild(icon);
+
+  const shortcut = document.createElement("link");
+  shortcut.rel = "shortcut icon";
+  shortcut.href = href;
+  document.head.appendChild(shortcut);
+}
+
 function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
@@ -70,6 +98,17 @@ function App() {
 
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  // Apply the optional tab title and favicon cloak. Replace every declared icon
+  // and cache-bust the URL so Safari does not keep showing the previous favicon.
+  useEffect(() => {
+    const enabled = settings.tabCloakEnabled;
+    document.title = enabled && settings.tabCloakTitle.trim()
+      ? settings.tabCloakTitle.trim()
+      : "Kara — Private Web Relay";
+
+    applyTabFavicon(enabled ? settings.tabCloakFavicon : "/Kara.png");
+  }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
 
   // Apply theme to <html>
   useEffect(() => {
@@ -257,6 +296,7 @@ function App() {
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}
+        onPreviewFavicon={applyTabFavicon}
         customPalettes={customPalettes} onAddPalette={addPalette} onRemovePalette={removePalette} onSelectPalette={selectPalette}
         onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onClearHistory={clearHistory} onClearBookmarks={clearBookmarks} onResetAll={resetAll} onImportBackup={importBackup}
         onOpenVault={() => { setSettingsOpen(false); setVaultOpen(true); }} onAddEngine={addCustomEngine} onRemoveEngine={removeCustomEngine} onOpenStats={() => { setSettingsOpen(false); setStatsOpen(true); }}
