@@ -43,7 +43,7 @@ export function saveHistory(entries: HistoryEntry[]): void {
 
 const BUILT_IN_RELAYS = [
   { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/wisp/", addedAt: 0 },
-  { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/", addedAt: 0 },
+  { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/", addedAt: 0 },
 ];
 
 function ensureBuiltInRelays(): void {
@@ -53,8 +53,10 @@ function ensureBuiltInRelays(): void {
     const existing = Array.isArray(stored)
       ? stored.filter((item) => item && typeof item.id === "string" && typeof item.name === "string" && typeof item.url === "string")
       : [];
-    const migrated = existing.map((item) => item.url === "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
-      ? { ...item, id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-proxy-wisp.onrender.com/wisp/" }
+    const migrated = existing.map((item) => item.url === "wss://kara-proxy-wisp.onrender.com/wisp/"
+      ? { ...item, id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/" }
+      : item.url === "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
+      ? { ...item, id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/" }
       : item.url === "wss://kara.prod.page/"
         ? { ...item, url: "wss://kara.prod.page/wisp/" }
         : item);
@@ -70,7 +72,7 @@ export function loadSettings(): Settings {
     if (raw) {
       const p = JSON.parse(raw) as Partial<Settings>;
       return {
-        relay: (() => { const last = localStorage.getItem("kara-last-relay"); const migratedLast = last === "wss://kara.prod.page/" ? "wss://kara.prod.page/wisp/" : last; if (migratedLast && (migratedLast.startsWith("ws://") || migratedLast.startsWith("wss://"))) return migratedLast; const saved = p.relay === "wss://kara.prod.page/" ? "wss://kara.prod.page/wisp/" : p.relay; return typeof saved === "string" && (saved.startsWith("ws://") || saved.startsWith("wss://")) ? saved : DEFAULT_RELAY; })(),
+        relay: (() => { const last = localStorage.getItem("kara-last-relay"); const migratedLast = last === "wss://kara-proxy-wisp.onrender.com/wisp/" ? "wss://kara-wisp-relay-p9eh.onrender.com/wisp/" : last === "wss://kara.prod.page/" ? "wss://kara.prod.page/wisp/" : last; if (migratedLast && (migratedLast.startsWith("ws://") || migratedLast.startsWith("wss://"))) return migratedLast; const saved = p.relay === "wss://kara-proxy-wisp.onrender.com/wisp/" ? "wss://kara-wisp-relay-p9eh.onrender.com/wisp/" : p.relay === "wss://kara.prod.page/" ? "wss://kara.prod.page/wisp/" : p.relay; return typeof saved === "string" && (saved.startsWith("ws://") || saved.startsWith("wss://")) ? saved : DEFAULT_RELAY; })(),
         relayToken: typeof p.relayToken === "string" ? p.relayToken : DEFAULT_RELAY_TOKEN,
         searchEngineId: p.searchEngineId || DEFAULT_SEARCH_ENGINE_ID,
         themeColor: p.themeColor || DEFAULT_THEME_COLOR,
