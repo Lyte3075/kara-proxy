@@ -674,9 +674,9 @@ export default function SettingsPage({
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {section.items.map((preset) => {
-                          // Use each service's own favicon first, not Google's shared favicon proxy.
-                          const icon = `https://${preset.domain}/favicon.ico`;
-                          const fallbackIcon = `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
+                          // Resolve a favicon per preset domain without routing every icon through Google.
+                          const icon = `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
+                          const fallbackIcon = `https://${preset.domain}/favicon.ico`;
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
