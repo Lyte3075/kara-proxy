@@ -616,17 +616,73 @@ export default function SettingsPage({
                   <input type="url" value={tabCloakFavicon} onChange={(e) => setTabCloakFavicon(e.target.value)} placeholder="https://example.com/favicon.ico" className="input font-mono" disabled={!tabCloakEnabled} />
                   <p className="text-[11px] text-[var(--text-faint)] mt-1.5">Use a direct HTTP or HTTPS image URL. Some browsers cache favicons, so changes may not appear immediately.</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-4">
                   {[
-                    { label: "Google Classroom", title: "Google Classroom", icon: "https://www.google.com/s2/favicons?domain=classroom.google.com&sz=64" },
-                    { label: "Google Docs", title: "Google Docs", icon: "https://www.google.com/s2/favicons?domain=docs.google.com&sz=64" },
-                    { label: "Google Drive", title: "Google Drive", icon: "https://www.google.com/s2/favicons?domain=drive.google.com&sz=64" },
-                  ].map((preset) => (
-                    <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(preset.icon); }} className="px-3 py-2 rounded-lg border text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition" style={{ borderColor: "var(--border-primary)" }}>
-                      {preset.label}
-                    </button>
+                    { group: "Learning platforms", items: [
+                      { label: "Canvas Dashboard", title: "Canvas Dashboard", domain: "canvas.instructure.com" },
+                      { label: "ClassLink", title: "ClassLink", domain: "my.classlink.com" },
+                      { label: "Clever", title: "Clever", domain: "clever.com" },
+                      { label: "Schoology", title: "Schoology", domain: "app.schoology.com" },
+                      { label: "Blackboard", title: "Blackboard", domain: "blackboard.com" },
+                      { label: "Moodle", title: "Moodle", domain: "moodle.org" },
+                      { label: "PowerSchool", title: "PowerSchool", domain: "powerschool.com" },
+                      { label: "Infinite Campus", title: "Infinite Campus", domain: "infinitecampus.com" },
+                      { label: "Google Classroom", title: "Google Classroom", domain: "classroom.google.com" },
+                      { label: "Microsoft Teams", title: "Microsoft Teams", domain: "teams.microsoft.com" },
+                      { label: "OneNote", title: "OneNote", domain: "onenote.com" },
+                    ]},
+                    { group: "Classroom tools", items: [
+                      { label: "Seesaw", title: "Seesaw", domain: "web.seesaw.me" },
+                      { label: "Nearpod", title: "Nearpod", domain: "nearpod.com" },
+                      { label: "Kahoot!", title: "Kahoot!", domain: "kahoot.com" },
+                      { label: "Quizlet", title: "Quizlet", domain: "quizlet.com" },
+                      { label: "IXL", title: "IXL", domain: "ixl.com" },
+                      { label: "Edpuzzle", title: "Edpuzzle", domain: "edpuzzle.com" },
+                      { label: "Newsela", title: "Newsela", domain: "newsela.com" },
+                      { label: "Edmodo", title: "Edmodo", domain: "edmodo.com" },
+                    ]},
+                    { group: "Learning resources", items: [
+                      { label: "Khan Academy", title: "Khan Academy", domain: "khanacademy.org" },
+                      { label: "Duolingo", title: "Duolingo", domain: "duolingo.com" },
+                      { label: "Prodigy", title: "Prodigy", domain: "prodigygame.com" },
+                      { label: "BrainPOP", title: "BrainPOP", domain: "brainpop.com" },
+                      { label: "Discovery Education", title: "Discovery Education", domain: "discoveryeducation.com" },
+                      { label: "McGraw Hill", title: "McGraw Hill", domain: "mheducation.com" },
+                      { label: "Pearson", title: "Pearson", domain: "pearson.com" },
+                      { label: "Savvas", title: "Savvas", domain: "savvas.com" },
+                      { label: "HMH", title: "HMH", domain: "hmhco.com" },
+                    ]},
+                    { group: "Google Workspace", items: [
+                      { label: "Google Docs", title: "Google Docs", domain: "docs.google.com" },
+                      { label: "Google Drive", title: "Google Drive", domain: "drive.google.com" },
+                      { label: "Google Slides", title: "Google Slides", domain: "slides.google.com" },
+                      { label: "Google Sheets", title: "Google Sheets", domain: "sheets.google.com" },
+                    ]},
+                    { group: "Microsoft 365", items: [
+                      { label: "Microsoft Word", title: "Microsoft Word", domain: "word.cloud.microsoft" },
+                      { label: "Microsoft Excel", title: "Microsoft Excel", domain: "excel.cloud.microsoft" },
+                      { label: "Microsoft PowerPoint", title: "Microsoft PowerPoint", domain: "powerpoint.cloud.microsoft" },
+                      { label: "Microsoft Outlook", title: "Outlook", domain: "outlook.office.com" },
+                    ]},
+                  ].map((section) => (
+                    <div key={section.group}>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {section.items.map((preset) => {
+                          const icon = `https://www.google.com/s2/favicons?domain=${preset.domain}&sz=64`;
+                          const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
+                          return (
+                            <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
+                              <img src={icon} alt="" loading="lazy" className="w-5 h-5 shrink-0 rounded-sm" />
+                              <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Preset icons are fetched from each service's domain favicon. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own favicon URL above.</p>
                 <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
                   <Check size={15} /> Save cloaking settings
                 </button>
