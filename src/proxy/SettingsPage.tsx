@@ -674,9 +674,14 @@ export default function SettingsPage({
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {section.items.map((preset) => {
-                          // Resolve a favicon per preset domain without routing every icon through Google.
-                          const icon = `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
-                          const fallbackIcon = `https://${preset.domain}/favicon.ico`;
+                          // ClassLink publishes its LaunchPad favicon on its own CDN.
+                          // Other presets use a domain-specific icon with the site's favicon as fallback.
+                          const icon = preset.title === "ClassLink"
+                            ? "https://cdn.classlink.com/production/launchpad/resources/images/favicon/favicon-32x32.png"
+                            : `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
+                          const fallbackIcon = preset.title === "ClassLink"
+                            ? "https://launchpad.classlink.com/favicon.ico"
+                            : `https://${preset.domain}/favicon.ico`;
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
@@ -689,7 +694,7 @@ export default function SettingsPage({
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Each preset loads its own site's /favicon.ico directly, with a domain-specific icon fallback. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Presets use domain-specific icons. ClassLink uses its published LaunchPad CDN favicon. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
                 <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
                   <Check size={15} /> Save cloaking settings
                 </button>
