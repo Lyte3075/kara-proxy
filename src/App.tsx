@@ -71,25 +71,52 @@ function App() {
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
 
-  // Apply the optional tab title and favicon cloak.
+  // Apply the optional tab title and favicon cloak. Replace every declared icon
+  // and cache-bust the URL so Safari does not keep showing the previous favicon.
   useEffect(() => {
     const enabled = settings.tabCloakEnabled;
     document.title = enabled && settings.tabCloakTitle.trim()
       ? settings.tabCloakTitle.trim()
       : "Kara — Private Web Relay";
 
-    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!favicon) return;
+    let iconUrl = "/Kara.png";
     if (enabled && settings.tabCloakFavicon.trim()) {
       try {
-        const url = new URL(settings.tabCloakFavicon.trim(), window.location.href);
-        favicon.href = url.protocol === "https:" || url.protocol === "http:" ? url.href : "/Kara.png";
+        const parsed = new URL(settings.tabCloakFavicon.trim(), window.location.href);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") iconUrl = parsed.href;
       } catch {
-        favicon.href = "/Kara.png";
+        iconUrl = "/Kara.png";
       }
-    } else {
-      favicon.href = "/Kara.png";
     }
+
+    const cacheBusted = new URL(iconUrl, window.location.href);
+    cacheBusted.searchParams.set("kara_icon", String(Date.now()));
+    const href = cacheBusted.href;
+
+    let iconLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+    if (iconLinks.length === 0) {
+      const link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+      iconLinks = [link];
+    }
+    iconLinks.forEach((link) => {
+      link.href = href;
+      link.type = "image/png";
+    });
+
+    let shortcutIcon = document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]');
+    if (!shortcutIcon) {
+      shortcutIcon = document.createElement("link");
+      shortcutIcon.rel = "shortcut icon";
+      document.head.appendChild(shortcutIcon);
+    }
+    shortcutIcon.href = href;
+
+    // Keep the Home Screen icon in sync where the browser supports it.
+    document.querySelectorAll<HTMLLinkElement>('link[rel="apple-touch-icon"]').forEach((link) => {
+      link.href = href;
+    });
   }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
 
   // Apply theme to <html>
