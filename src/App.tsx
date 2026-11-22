@@ -71,6 +71,27 @@ function App() {
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
 
+  // Apply the optional tab title and favicon cloak.
+  useEffect(() => {
+    const enabled = settings.tabCloakEnabled;
+    document.title = enabled && settings.tabCloakTitle.trim()
+      ? settings.tabCloakTitle.trim()
+      : "Kara — Private Web Relay";
+
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!favicon) return;
+    if (enabled && settings.tabCloakFavicon.trim()) {
+      try {
+        const url = new URL(settings.tabCloakFavicon.trim(), window.location.href);
+        favicon.href = url.protocol === "https:" || url.protocol === "http:" ? url.href : "/Kara.png";
+      } catch {
+        favicon.href = "/Kara.png";
+      }
+    } else {
+      favicon.href = "/Kara.png";
+    }
+  }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
+
   // Apply theme to <html>
   useEffect(() => {
     const root = document.documentElement;
