@@ -2,11 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/Kara.png" />
+    <script>
+      (() => {
+        // Set the tab icon before the browser finishes parsing the document.
+        // Safari often ignores favicon changes made later by a client-side app.
+        let href = "/Kara.png";
+        try {
+          const saved = JSON.parse(localStorage.getItem("kara.settings") || "null");
+          if (saved && saved.tabCloakEnabled && typeof saved.tabCloakFavicon === "string" && saved.tabCloakFavicon.trim()) {
+            const selected = new URL(saved.tabCloakFavicon.trim(), location.href);
+            if (selected.protocol === "https:" || selected.protocol === "http:") {
+              href = selected.origin === location.origin
+                ? selected.href
+                : "/api/favicon?url=" + encodeURIComponent(selected.href);
+            }
+          }
+        } catch {}
+        const icon = document.createElement("link");
+        icon.rel = "icon";
+        icon.href = href;
+        document.head.appendChild(icon);
+        const shortcut = document.createElement("link");
+        shortcut.rel = "shortcut icon";
+        shortcut.href = href;
+        document.head.appendChild(shortcut);
+      })();
+    </script>
     <link rel="apple-touch-icon" href="/Kara.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kara — Private Web Relay</title>
+    <title>Kara's Proxy</title>
     <script src="%BASE_URL%scramjet/scramjet.js"></script>
     <script src="%BASE_URL%controller/controller.api.js"></script>
     <meta property="og:image" content="/Kara.png" />

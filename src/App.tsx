@@ -26,30 +26,32 @@ import {
 
 function applyTabFavicon(faviconUrl: string) {
   let iconUrl = "/Kara.png";
+
   try {
     const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
-    if (parsed.protocol === "https:" || parsed.protocol === "http:") iconUrl = parsed.href;
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      // Keep remote icons on Kara's origin. A stable URL per selected icon
+      // avoids Safari treating every React render as a new favicon resource.
+      iconUrl = parsed.origin === window.location.origin
+        ? parsed.href
+        : `/api/favicon?url=${encodeURIComponent(parsed.href)}`;
+    }
   } catch {
     iconUrl = "/Kara.png";
   }
 
-  // A fresh URL forces the browser to request the selected icon instead of
-  // reusing a previously cached favicon for this tab.
-  const cacheBusted = new URL(iconUrl, window.location.href);
-  cacheBusted.searchParams.set("kara_icon", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const href = cacheBusted.href;
+  const setIcon = (rel: string) => {
+    let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = rel;
+      document.head.appendChild(link);
+    }
+    link.href = iconUrl;
+  };
 
-  document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach((link) => link.remove());
-
-  const icon = document.createElement("link");
-  icon.rel = "icon";
-  icon.href = href;
-  document.head.appendChild(icon);
-
-  const shortcut = document.createElement("link");
-  shortcut.rel = "shortcut icon";
-  shortcut.href = href;
-  document.head.appendChild(shortcut);
+  setIcon("icon");
+  setIcon("shortcut icon");
 }
 
 function App() {
@@ -105,7 +107,7 @@ function App() {
     const enabled = settings.tabCloakEnabled;
     document.title = enabled && settings.tabCloakTitle.trim()
       ? settings.tabCloakTitle.trim()
-      : "Kara — Private Web Relay";
+      : "Kara's Proxy";
 
     applyTabFavicon(enabled ? settings.tabCloakFavicon : "/Kara.png");
   }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
