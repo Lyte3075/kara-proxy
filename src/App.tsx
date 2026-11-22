@@ -35,8 +35,31 @@ function App() {
   const [customPalettes, setCustomPalettes] = useState<CustomPalette[]>(() => loadCustomPalettes());
   const [stats, setStats] = useState<ProxyStats>(() => loadStats());
   const [speedTests, setSpeedTests] = useState<SpeedTestResult[]>(() => loadSpeedTests());
-  const [tabs, setTabs] = useState<BrowserTab[]>(() => [createTab()]);
-  const [activeTabId, setActiveTabId] = useState(() => tabs[0].id);
+  const [restoredTabs] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("kara.openTabs");
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as { tabs?: BrowserTab[]; activeTabId?: string };
+      if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null;
+      const validTabs = parsed.tabs.filter((tab) =>
+        tab && typeof tab.id === "string" &&
+        (tab.url === null || typeof tab.url === "string") &&
+        (tab.iframeUrl === null || typeof tab.iframeUrl === "string") &&
+        Array.isArray(tab.history) && typeof tab.navIdx === "number"
+      ).map((tab) => ({ ...tab, loading: false, error: null }));
+      if (validTabs.length === 0) return null;
+      return {
+        tabs: validTabs.slice(0, 30),
+        activeTabId: validTabs.some((tab) => tab.id === parsed.activeTabId)
+          ? parsed.activeTabId!
+          : validTabs[0].id,
+      };
+    } catch {
+      return null;
+    }
+  });
+  const [tabs, setTabs] = useState<BrowserTab[]>(() => restoredTabs?.tabs ?? [createTab()]);
+  const [activeTabId, setActiveTabId] = useState(() => restoredTabs?.activeTabId ?? tabs[0].id);
   const [input, setInput] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -69,6 +92,15 @@ function App() {
   useEffect(() => saveCustomEngines(customEngines), [customEngines]);
   useEffect(() => saveStats(stats), [stats]);
   useEffect(() => saveCustomPalettes(customPalettes), [customPalettes]);
+
+  // Keep the current tab session recoverable if iOS reloads or restores this page.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("kara.openTabs", JSON.stringify({ tabs, activeTabId }));
+    } catch (error) {
+      console.warn("[Kara] Could not save open tabs for session recovery.", error);
+    }
+  }, [tabs, activeTabId]);
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {

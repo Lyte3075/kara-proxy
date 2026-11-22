@@ -62,7 +62,7 @@ export interface Settings {
   blockTrackers: boolean;
 }
 
-export const DEFAULT_RELAY = "wss://kara.prod.page/";
+export const DEFAULT_RELAY = "wss://kara.prod.page/wisp/";
 export const DEFAULT_RELAY_TOKEN = "";
 export const DEFAULT_SEARCH_ENGINE_ID = "duckduckgo";
 export const DEFAULT_THEME_COLOR: ThemeColor = "red";

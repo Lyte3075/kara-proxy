@@ -7,6 +7,37 @@ import {
   type Frame,
 } from "@mercuryworkshop/scramjet-controller";
 
+// Some transports return a body stream for statuses that the Fetch standard
+// requires to be bodyless. Normalize those responses at the constructor
+// boundary so every Scramjet code path is protected, not just the relay adapter.
+function installSafeResponseGuard(scope: typeof globalThis): void {
+  const guardKey = Symbol.for("kara.safe-response-guard");
+  const target = scope as typeof globalThis & { [key: symbol]: unknown };
+  if (target[guardKey]) return;
+
+  const NativeResponse = scope.Response;
+  const SafeResponse = new Proxy(NativeResponse, {
+    construct(responseConstructor, args, newTarget) {
+      const body = args[0];
+      const init = args[1] as ResponseInit | undefined;
+      if ([204, 205, 304].includes(init?.status ?? 200) && body != null) {
+        console.warn("[Kara] Normalized a body on HTTP", init?.status, "response.");
+        args[0] = null;
+      }
+      return Reflect.construct(responseConstructor, args, newTarget);
+    },
+  });
+
+  Object.defineProperty(scope, "Response", {
+    configurable: true,
+    writable: true,
+    value: SafeResponse,
+  });
+  Object.defineProperty(target, guardKey, { value: true });
+}
+
+installSafeResponseGuard(window);
+
 export interface KaraFilterConfig {
   enabled: boolean;
   blockedDomains: string[];
@@ -48,6 +79,34 @@ export function createKaraFilterPlugin(
   getConfig: () => KaraFilterConfig
 ): ManagedPlugin {
   return new KaraFilterPlugin(getConfig);
+}
+
+/**
+ * libcurl-transport can return a stream body for HTTP statuses that Fetch
+ * requires to be bodyless. Scramjet reconstructs these as native Responses,
+ * which throws unless the body is null.
+ */
+function createSafeTransport(wispUrl: string): LibcurlClient {
+  const client = new LibcurlClient({ wisp: wispUrl });
+
+  return new Proxy(client, {
+    get(target, property, receiver) {
+      if (property === "request") {
+        return async (...args: Parameters<LibcurlClient["request"]>) => {
+          const response = await target.request(...args);
+          if ([204, 205, 304].includes(response.status)) {
+            return { ...response, body: null } as unknown as Awaited<
+              ReturnType<LibcurlClient["request"]>
+            >;
+          }
+          return response;
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
 }
 
 export function normalizeWispEndpoint(endpoint: string, token: string): string {
@@ -105,7 +164,7 @@ async function initializeController(wispUrl: string): Promise<Controller> {
 
   const controller = new Controller({
     serviceworker,
-    transport: new LibcurlClient({ wisp: wispUrl }),
+    transport: createSafeTransport(wispUrl),
     config: {
       prefix: `${base.pathname}~/sj/`,
       scramjetPath: new URL("scramjet/scramjet.js", base).pathname,
@@ -137,7 +196,7 @@ export async function getScramjetController(
 
   const controller = await controllerPromise;
   if (activeWispUrl !== wispUrl) {
-    controller.setTransport(new LibcurlClient({ wisp: wispUrl }));
+    controller.setTransport(createSafeTransport(wispUrl));
     activeWispUrl = wispUrl;
   }
   return controller;
