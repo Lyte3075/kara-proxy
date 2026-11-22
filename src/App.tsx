@@ -24,6 +24,36 @@ import {
   applyCustomPalette, uid,
 } from "@/proxy/utils";
 
+function applyTabFavicon(faviconUrl: string) {
+  let iconUrl = "/Kara.png";
+
+  try {
+    const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      // Keep remote icons on Kara's origin. A stable URL per selected icon
+      // avoids Safari treating every React render as a new favicon resource.
+      iconUrl = parsed.origin === window.location.origin
+        ? parsed.href
+        : `/api/favicon?url=${encodeURIComponent(parsed.href)}`;
+    }
+  } catch {
+    iconUrl = "/Kara.png";
+  }
+
+  const setIcon = (rel: string) => {
+    let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = rel;
+      document.head.appendChild(link);
+    }
+    link.href = iconUrl;
+  };
+
+  setIcon("icon");
+  setIcon("shortcut icon");
+}
+
 function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
@@ -70,6 +100,17 @@ function App() {
 
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  // Apply the optional tab title and favicon cloak. Replace every declared icon
+  // and cache-bust the URL so Safari does not keep showing the previous favicon.
+  useEffect(() => {
+    const enabled = settings.tabCloakEnabled;
+    document.title = enabled && settings.tabCloakTitle.trim()
+      ? settings.tabCloakTitle.trim()
+      : "Kara's Proxy";
+
+    applyTabFavicon(enabled ? settings.tabCloakFavicon : "/Kara.png");
+  }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
 
   // Apply theme to <html>
   useEffect(() => {
@@ -257,6 +298,7 @@ function App() {
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}
+        onPreviewFavicon={applyTabFavicon}
         customPalettes={customPalettes} onAddPalette={addPalette} onRemovePalette={removePalette} onSelectPalette={selectPalette}
         onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onClearHistory={clearHistory} onClearBookmarks={clearBookmarks} onResetAll={resetAll} onImportBackup={importBackup}
         onOpenVault={() => { setSettingsOpen(false); setVaultOpen(true); }} onAddEngine={addCustomEngine} onRemoveEngine={removeCustomEngine} onOpenStats={() => { setSettingsOpen(false); setStatsOpen(true); }}

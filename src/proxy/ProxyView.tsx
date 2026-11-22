@@ -220,7 +220,7 @@ export default function ProxyView({
         ref={iframeRef}
         onLoad={onLoad}
         title="Browsing session"
-        className="w-full h-full bg-white"
+        className="w-full h-full bg-black"
         style={{ display: iframeUrl && !error ? "block" : "none" }}
         sandbox="allow-same-origin allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation"
         allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture"
