@@ -296,6 +296,7 @@ function App() {
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}
+        onPreviewFavicon={applyTabFavicon}
         customPalettes={customPalettes} onAddPalette={addPalette} onRemovePalette={removePalette} onSelectPalette={selectPalette}
         onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onClearHistory={clearHistory} onClearBookmarks={clearBookmarks} onResetAll={resetAll} onImportBackup={importBackup}
         onOpenVault={() => { setSettingsOpen(false); setVaultOpen(true); }} onAddEngine={addCustomEngine} onRemoveEngine={removeCustomEngine} onOpenStats={() => { setSettingsOpen(false); setStatsOpen(true); }}
