@@ -24,6 +24,34 @@ import {
   applyCustomPalette, uid,
 } from "@/proxy/utils";
 
+function applyTabFavicon(faviconUrl: string) {
+  let iconUrl = "/Kara.png";
+  try {
+    const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") iconUrl = parsed.href;
+  } catch {
+    iconUrl = "/Kara.png";
+  }
+
+  // A fresh URL forces the browser to request the selected icon instead of
+  // reusing a previously cached favicon for this tab.
+  const cacheBusted = new URL(iconUrl, window.location.href);
+  cacheBusted.searchParams.set("kara_icon", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const href = cacheBusted.href;
+
+  document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach((link) => link.remove());
+
+  const icon = document.createElement("link");
+  icon.rel = "icon";
+  icon.href = href;
+  document.head.appendChild(icon);
+
+  const shortcut = document.createElement("link");
+  shortcut.rel = "shortcut icon";
+  shortcut.href = href;
+  document.head.appendChild(shortcut);
+}
+
 function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
@@ -79,43 +107,7 @@ function App() {
       ? settings.tabCloakTitle.trim()
       : "Kara — Private Web Relay";
 
-    let iconUrl = "/Kara.png";
-    if (enabled && settings.tabCloakFavicon.trim()) {
-      try {
-        const parsed = new URL(settings.tabCloakFavicon.trim(), window.location.href);
-        if (parsed.protocol === "https:" || parsed.protocol === "http:") iconUrl = parsed.href;
-      } catch {
-        iconUrl = "/Kara.png";
-      }
-    }
-
-    const cacheBusted = new URL(iconUrl, window.location.href);
-    cacheBusted.searchParams.set("kara_icon", String(Date.now()));
-    const href = cacheBusted.href;
-
-    let iconLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
-    if (iconLinks.length === 0) {
-      const link = document.createElement("link");
-      link.rel = "icon";
-      document.head.appendChild(link);
-      iconLinks = [link];
-    }
-    iconLinks.forEach((link) => {
-      link.href = href;
-    });
-
-    let shortcutIcon = document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]');
-    if (!shortcutIcon) {
-      shortcutIcon = document.createElement("link");
-      shortcutIcon.rel = "shortcut icon";
-      document.head.appendChild(shortcutIcon);
-    }
-    shortcutIcon.href = href;
-
-    // Keep the Home Screen icon in sync where the browser supports it.
-    document.querySelectorAll<HTMLLinkElement>('link[rel="apple-touch-icon"]').forEach((link) => {
-      link.href = href;
-    });
+    applyTabFavicon(enabled ? settings.tabCloakFavicon : "/Kara.png");
   }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
 
   // Apply theme to <html>
