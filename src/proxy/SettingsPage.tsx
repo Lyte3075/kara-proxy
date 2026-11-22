@@ -669,11 +669,12 @@ export default function SettingsPage({
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {section.items.map((preset) => {
-                          const icon = `https://www.google.com/s2/favicons?domain=${preset.domain}&sz=64`;
+                          const icon = `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(`https://${preset.domain}`)}&sz=64`;
+                          const fallbackIcon = `https://${preset.domain}/favicon.ico`;
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
-                              <img src={icon} alt="" loading="lazy" className="w-5 h-5 shrink-0 rounded-sm" />
+                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (image.src !== fallbackIcon) image.src = fallbackIcon; }} className="w-5 h-5 shrink-0 rounded-sm" />
                               <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
                             </button>
                           );
@@ -682,7 +683,7 @@ export default function SettingsPage({
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Preset icons are fetched from each service's domain favicon. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own favicon URL above.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Preset icons are fetched using each service's full domain URL, with that site's /favicon.ico as a fallback. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
                 <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
                   <Check size={15} /> Save cloaking settings
                 </button>
