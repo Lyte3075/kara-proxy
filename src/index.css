@@ -209,3 +209,16 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--accent-soft);
 }
+/* Keep the page canvas and mobile safe-area gutters black behind the app UI. */
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #000;
+}
+
+html,
+body {
+  margin: 0;
+  overscroll-behavior: none;
+}
