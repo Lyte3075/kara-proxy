@@ -223,7 +223,7 @@ export default function ProxyView({
         className="w-full h-full bg-white"
         style={{ display: iframeUrl && !error ? "block" : "none" }}
         sandbox="allow-same-origin allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation"
-        allow="accelerometer; autoplay; clipboard-read; clipboard-write; fullscreen; geolocation; microphone; camera; payment; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture"
         referrerPolicy="no-referrer"
       />
     </div>
