@@ -39,6 +39,7 @@ interface SettingsPageProps {
   stats: ProxyStats;
   onClose: () => void;
   onSave: (settings: Settings) => void;
+  onPreviewFavicon: (faviconUrl: string) => void;
   onClearHistory: () => void;
   onClearBookmarks: () => void;
   onResetAll: () => void;
@@ -70,6 +71,7 @@ export default function SettingsPage({
   stats,
   onClose,
   onSave,
+  onPreviewFavicon,
   onClearHistory,
   onClearBookmarks,
   onResetAll,
@@ -684,7 +686,7 @@ export default function SettingsPage({
                             : `https://${preset.domain}/favicon.ico`;
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
-                            <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
+                            <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); onPreviewFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
                               <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (!image.dataset.fallbackTried) { image.dataset.fallbackTried = "true"; image.src = fallbackIcon; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
                               <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
                             </button>
