@@ -18,7 +18,7 @@ function scramjetNoBodyStatusPatch() {
         throw new Error('Kara could not find dist/controller/controller.sw.js to apply the Scramjet response fix.');
       }
 
-      const unsafeResponse = /new Response\\(([$\\w]+)\\.body,\\s*\\{\\s*status:\\s*\\1\\.status,\\s*statusText:\\s*\\1\\.statusText,\\s*headers:\\s*\\1\\.headers\\s*\\}\\)/g;
+      const unsafeResponse = /new Response\(([$\w]+)\.body,\s*\{\s*status:\s*\1\.status,\s*statusText:\s*\1\.statusText,\s*headers:\s*\1\.headers\s*\}\)/g;
       const patched = worker.replace(
         unsafeResponse,
         'new Response([204, 205, 304].includes($1.status) ? null : $1.body, { status: $1.status, statusText: $1.statusText, headers: $1.headers })'
