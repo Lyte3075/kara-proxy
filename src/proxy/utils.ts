@@ -79,10 +79,13 @@ export function loadSettings(): Settings {
         themeMode: p.themeMode || DEFAULT_THEME_MODE,
         customPaletteId: p.customPaletteId ?? null,
         blockTrackers: p.blockTrackers === true,
+        tabCloakEnabled: p.tabCloakEnabled === true,
+        tabCloakTitle: typeof p.tabCloakTitle === "string" ? p.tabCloakTitle : "",
+        tabCloakFavicon: typeof p.tabCloakFavicon === "string" ? p.tabCloakFavicon : "",
       };
     }
   } catch {}
-  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS };
+  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS, tabCloakEnabled: false, tabCloakTitle: "", tabCloakFavicon: "" };
 }
 
 export function saveSettings(settings: Settings): void {
