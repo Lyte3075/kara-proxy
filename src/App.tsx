@@ -107,7 +107,7 @@ function App() {
     const enabled = settings.tabCloakEnabled;
     document.title = enabled && settings.tabCloakTitle.trim()
       ? settings.tabCloakTitle.trim()
-      : "Kara — Private Web Relay";
+      : "Kara's Proxy";
 
     applyTabFavicon(enabled ? settings.tabCloakFavicon : "/Kara.png");
   }, [settings.tabCloakEnabled, settings.tabCloakTitle, settings.tabCloakFavicon]);
