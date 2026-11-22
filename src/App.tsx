@@ -102,7 +102,6 @@ function App() {
     }
     iconLinks.forEach((link) => {
       link.href = href;
-      link.type = "image/png";
     });
 
     let shortcutIcon = document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]');
