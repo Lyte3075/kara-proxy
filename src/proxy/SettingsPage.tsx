@@ -216,14 +216,20 @@ export default function SettingsPage({
         }
       } catch {}
     }
-    doc.documentElement.style.cssText = "width:100%;height:100%;margin:0;overflow:hidden;background:#09090b";
-    doc.body.style.cssText = "width:100%;height:100%;margin:0;overflow:hidden";
+    // Give the blank document a real mobile viewport so the embedded app uses
+    // the device's CSS-pixel width instead of Safari's desktop layout viewport.
+    const viewport = doc.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width, initial-scale=1, viewport-fit=cover";
+    doc.head.appendChild(viewport);
+    doc.documentElement.style.cssText = "position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#09090b";
+    doc.body.style.cssText = "position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#09090b";
     const frame = doc.createElement("iframe");
     frame.title = "Kara Proxy";
     frame.src = window.location.href;
     frame.allow = "accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture";
     frame.referrerPolicy = "no-referrer";
-    frame.style.cssText = "display:block;width:100%;height:100%;border:0;background:#09090b";
+    frame.style.cssText = "position:fixed;inset:0;display:block;width:100vw;height:100vh;height:100dvh;min-height:100%;margin:0;padding:0;border:0;background:#09090b";
     doc.body.appendChild(frame);
   };
 
@@ -668,12 +674,13 @@ export default function SettingsPage({
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-2">{section.group}</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {section.items.map((preset) => {
-                          const icon = `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(`https://${preset.domain}`)}&sz=64`;
-                          const fallbackIcon = `https://${preset.domain}/favicon.ico`;
+                          // Use each service's own favicon first, not Google's shared favicon proxy.
+                          const icon = `https://${preset.domain}/favicon.ico`;
+                          const fallbackIcon = `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
-                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (image.src !== fallbackIcon) image.src = fallbackIcon; }} className="w-5 h-5 shrink-0 rounded-sm" />
+                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (!image.dataset.fallbackTried) { image.dataset.fallbackTried = "true"; image.src = fallbackIcon; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
                               <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
                             </button>
                           );
@@ -682,7 +689,7 @@ export default function SettingsPage({
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Preset icons are fetched using each service's full domain URL, with that site's /favicon.ico as a fallback. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Each preset loads its own site's /favicon.ico directly, with a domain-specific icon fallback. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
                 <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
                   <Check size={15} /> Save cloaking settings
                 </button>
