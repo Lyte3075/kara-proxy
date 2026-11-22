@@ -7,6 +7,37 @@ import {
   type Frame,
 } from "@mercuryworkshop/scramjet-controller";
 
+// Some transports return a body stream for statuses that the Fetch standard
+// requires to be bodyless. Normalize those responses at the constructor
+// boundary so every Scramjet code path is protected, not just the relay adapter.
+function installSafeResponseGuard(scope: typeof globalThis): void {
+  const guardKey = Symbol.for("kara.safe-response-guard");
+  const target = scope as typeof globalThis & { [key: symbol]: unknown };
+  if (target[guardKey]) return;
+
+  const NativeResponse = scope.Response;
+  const SafeResponse = new Proxy(NativeResponse, {
+    construct(responseConstructor, args, newTarget) {
+      const body = args[0];
+      const init = args[1] as ResponseInit | undefined;
+      if ([204, 205, 304].includes(init?.status ?? 200) && body != null) {
+        console.warn("[Kara] Normalized a body on HTTP", init?.status, "response.");
+        args[0] = null;
+      }
+      return Reflect.construct(responseConstructor, args, newTarget);
+    },
+  });
+
+  Object.defineProperty(scope, "Response", {
+    configurable: true,
+    writable: true,
+    value: SafeResponse,
+  });
+  Object.defineProperty(target, guardKey, { value: true });
+}
+
+installSafeResponseGuard(window);
+
 export interface KaraFilterConfig {
   enabled: boolean;
   blockedDomains: string[];
