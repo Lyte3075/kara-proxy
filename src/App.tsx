@@ -24,52 +24,34 @@ import {
   applyCustomPalette, uid,
 } from "@/proxy/utils";
 
-let faviconRequestId = 0;
-
-async function applyTabFavicon(faviconUrl: string) {
-  const requestId = ++faviconRequestId;
+function applyTabFavicon(faviconUrl: string) {
   let iconUrl = "/Kara.png";
 
   try {
     const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
     if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-      if (parsed.origin === window.location.origin) {
-        iconUrl = parsed.href;
-      } else {
-        // Serve remote icons from Kara's own origin. Safari can otherwise keep
-        // a stale cross-site favicon attached to the tab even after its URL changes.
-        const proxyUrl = new URL("/api/favicon", window.location.origin);
-        proxyUrl.searchParams.set("url", parsed.href);
-        proxyUrl.searchParams.set("v", String(requestId));
-
-        const response = await fetch(proxyUrl.href, { cache: "no-store" });
-        if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) {
-          throw new Error("Kara could not load the selected favicon.");
-        }
-        iconUrl = proxyUrl.href;
-      }
+      // Keep remote icons on Kara's origin. A stable URL per selected icon
+      // avoids Safari treating every React render as a new favicon resource.
+      iconUrl = parsed.origin === window.location.origin
+        ? parsed.href
+        : `/api/favicon?url=${encodeURIComponent(parsed.href)}`;
     }
-  } catch (error) {
-    console.warn("[Kara] Could not apply the selected favicon; using Kara's default icon.", error);
+  } catch {
     iconUrl = "/Kara.png";
   }
 
-  // Ignore older requests if the user selected another preset while one loaded.
-  if (requestId !== faviconRequestId) return;
+  const setIcon = (rel: string) => {
+    let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = rel;
+      document.head.appendChild(link);
+    }
+    link.href = iconUrl;
+  };
 
-  document.querySelectorAll<HTMLLinkElement>(
-    'link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
-  ).forEach((link) => link.remove());
-
-  const icon = document.createElement("link");
-  icon.rel = "icon";
-  icon.href = iconUrl;
-  document.head.appendChild(icon);
-
-  const shortcut = document.createElement("link");
-  shortcut.rel = "shortcut icon";
-  shortcut.href = iconUrl;
-  document.head.appendChild(shortcut);
+  setIcon("icon");
+  setIcon("shortcut icon");
 }
 
 function App() {
