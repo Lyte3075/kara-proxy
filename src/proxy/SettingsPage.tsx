@@ -677,10 +677,10 @@ export default function SettingsPage({
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {section.items.map((preset) => {
                           // ClassLink publishes its LaunchPad favicon on its own CDN.
-                          // Other presets use a domain-specific icon with the site's favicon as fallback.
+                          // Other presets use Google's domain-specific favicon service with the site's favicon as fallback.
                           const icon = preset.title === "ClassLink"
                             ? "https://cdn.classlink.com/production/launchpad/resources/images/favicon/favicon-32x32.png"
-                            : `https://icons.duckduckgo.com/ip3/${preset.domain}.ico`;
+                            : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(preset.domain)}&sz=64`;
                           const fallbackIcon = preset.title === "ClassLink"
                             ? "https://launchpad.classlink.com/favicon.ico"
                             : `https://${preset.domain}/favicon.ico`;
