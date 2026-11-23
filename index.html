@@ -12,19 +12,19 @@
           if (saved && saved.tabCloakEnabled && typeof saved.tabCloakFavicon === "string" && saved.tabCloakFavicon.trim()) {
             const selected = new URL(saved.tabCloakFavicon.trim(), location.href);
             if (selected.protocol === "https:" || selected.protocol === "http:") {
-              href = selected.origin === location.origin
-                ? selected.href
-                : "/api/favicon?url=" + encodeURIComponent(selected.href);
+              href = selected.href;
             }
           }
         } catch {}
         const icon = document.createElement("link");
         icon.rel = "icon";
         icon.href = href;
+        icon.onerror = () => { icon.onerror = null; icon.href = "/Kara.png"; };
         document.head.appendChild(icon);
         const shortcut = document.createElement("link");
         shortcut.rel = "shortcut icon";
         shortcut.href = href;
+        shortcut.onerror = () => { shortcut.onerror = null; shortcut.href = "/Kara.png"; };
         document.head.appendChild(shortcut);
       })();
     </script>
