@@ -28,29 +28,28 @@ function applyTabFavicon(faviconUrl: string) {
   let iconUrl = "/Kara.png";
 
   try {
-    const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
-    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-      // Browsers can load cross-origin favicons directly. Avoid routing them
-      // through the server-side fetch endpoint, which can fail for hosts that
-      // block automated requests even while the selector image loads normally.
+    const parsed = new URL(faviconUrl.trim(), window.location.href);
+    if ((parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.href !== window.location.href) {
       iconUrl = parsed.href;
     }
   } catch {
-    iconUrl = "/Kara.png";
+    // Keep Kara's own icon when the saved URL is empty or invalid.
   }
 
-  const setIcon = (rel: string) => {
+  for (const rel of ["icon", "shortcut icon"]) {
     let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
     if (!link) {
       link = document.createElement("link");
       link.rel = rel;
       document.head.appendChild(link);
     }
+    // A broken remote icon must never leave the browser tab without an icon.
+    link.onerror = () => {
+      link.onerror = null;
+      link.href = "/Kara.png";
+    };
     link.href = iconUrl;
-  };
-
-  setIcon("icon");
-  setIcon("shortcut icon");
+  }
 }
 
 function App() {
