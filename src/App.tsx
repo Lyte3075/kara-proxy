@@ -30,11 +30,10 @@ function applyTabFavicon(faviconUrl: string) {
   try {
     const parsed = new URL(faviconUrl.trim() || "/Kara.png", window.location.href);
     if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-      // Keep remote icons on Kara's origin. A stable URL per selected icon
-      // avoids Safari treating every React render as a new favicon resource.
-      iconUrl = parsed.origin === window.location.origin
-        ? parsed.href
-        : `/api/favicon?url=${encodeURIComponent(parsed.href)}`;
+      // Browsers can load cross-origin favicons directly. Avoid routing them
+      // through the server-side fetch endpoint, which can fail for hosts that
+      // block automated requests even while the selector image loads normally.
+      iconUrl = parsed.href;
     }
   } catch {
     iconUrl = "/Kara.png";
