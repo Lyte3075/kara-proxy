@@ -696,9 +696,18 @@ export default function SettingsPage({
                                 `https://favicon.im/${preset.domain}`,
                                 `https://icon.horse/icon/${preset.domain}`,
                               ];
-                          const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
+                          const selected = tabCloakTitle === preset.title;
                           return (
-                            <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); onPreviewFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
+                            <button key={preset.title} type="button" onClick={(event) => {
+                              const image = event.currentTarget.querySelector("img");
+                              // currentSrc is the actual fallback currently displayed,
+                              // not necessarily the preset's first (often missing) URL.
+                              const resolvedIcon = image?.currentSrc || image?.src || icon;
+                              setTabCloakEnabled(true);
+                              setTabCloakTitle(preset.title);
+                              setTabCloakFavicon(resolvedIcon);
+                              onPreviewFavicon(resolvedIcon);
+                            }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
                               <img
                                 src={icon}
                                 alt=""
