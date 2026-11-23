@@ -681,13 +681,25 @@ export default function SettingsPage({
                           const icon = preset.title === "ClassLink"
                             ? "https://cdn.classlink.com/production/launchpad/resources/images/favicon/favicon-32x32.png"
                             : `https://${preset.domain}/favicon.ico`;
-                          const fallbackIcon = preset.title === "ClassLink"
-                            ? "https://launchpad.classlink.com/favicon.ico"
-                            : `https://${preset.domain}/favicon.png`;
+                          const fallbackIcons = preset.title === "ClassLink"
+                            ? [
+                                "https://launchpad.classlink.com/favicon.ico",
+                                "https://launchpad.classlink.com/favicon.png",
+                                "https://favicon.im/launchpad.classlink.com",
+                                "https://icon.horse/icon/launchpad.classlink.com",
+                              ]
+                            : [
+                                `https://${preset.domain}/favicon.png`,
+                                `https://${preset.domain}/favicon.svg`,
+                                `https://${preset.domain}/apple-touch-icon.png`,
+                                `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(`https://${preset.domain}`)}&sz=64`,
+                                `https://favicon.im/${preset.domain}`,
+                                `https://icon.horse/icon/${preset.domain}`,
+                              ];
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); onPreviewFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
-                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; if (!image.dataset.fallbackTried) { image.dataset.fallbackTried = "true"; image.src = fallbackIcon; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
+                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; const next = Number(image.dataset.fallbackIndex || "0"); if (next < fallbackIcons.length) { image.dataset.fallbackIndex = String(next + 1); image.src = fallbackIcons[next]; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
                               <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
                             </button>
                           );
@@ -696,7 +708,7 @@ export default function SettingsPage({
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Presets load favicon files directly from each service's own domain. ClassLink uses its published LaunchPad CDN favicon. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Presets try each service's own favicon files first, then several independent favicon sources if needed. DuckDuckGo is not used. Some school-managed portals use district-specific branding, so you can replace any icon with your school's own image URL above.</p>
                 <button type="button" onClick={handleSave} className="btn-primary" disabled={!dirty}>
                   <Check size={15} /> Save cloaking settings
                 </button>
