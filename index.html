@@ -66,6 +66,12 @@
         window.addEventListener("error", event => {
           const target = event.target;
           if (target && target !== window && (target.src || target.href)) {
+            // Optional images and favicon links must never prevent Kara from starting.
+            // Browsers and school networks may block third-party branding assets.
+            if (
+              target instanceof HTMLImageElement ||
+              (target instanceof HTMLLinkElement && /(^|\\s)(icon|shortcut)(\\s|$)/i.test(target.rel))
+            ) return;
             showError("A page resource failed to load", target.src || target.href);
           } else {
             showError(event.message || "Unknown JavaScript error", event.filename ? event.filename + ":" + event.lineno + ":" + event.colno : "");
