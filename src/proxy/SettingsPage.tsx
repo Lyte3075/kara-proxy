@@ -699,7 +699,29 @@ export default function SettingsPage({
                           const selected = tabCloakTitle === preset.title && tabCloakFavicon === icon;
                           return (
                             <button key={preset.title} type="button" onClick={() => { setTabCloakEnabled(true); setTabCloakTitle(preset.title); setTabCloakFavicon(icon); onPreviewFavicon(icon); }} className="flex items-center gap-2 min-w-0 px-3 py-2.5 rounded-lg border text-left text-xs transition hover:text-[var(--text-primary)]" style={{ borderColor: selected ? "var(--accent)" : "var(--border-primary)", background: selected ? "var(--accent-glow)" : "transparent" }}>
-                              <img src={icon} alt="" loading="lazy" onError={(event) => { const image = event.currentTarget; const next = Number(image.dataset.fallbackIndex || "0"); if (next < fallbackIcons.length) { image.dataset.fallbackIndex = String(next + 1); image.src = fallbackIcons[next]; } else { image.style.visibility = "hidden"; } }} className="w-5 h-5 shrink-0 rounded-sm" />
+                              <img
+                                src={icon}
+                                alt=""
+                                loading="lazy"
+                                onLoad={(event) => {
+                                  const resolvedIcon = event.currentTarget.currentSrc || event.currentTarget.src;
+                                  if (tabCloakTitle === preset.title && resolvedIcon !== tabCloakFavicon) {
+                                    setTabCloakFavicon(resolvedIcon);
+                                    onPreviewFavicon(resolvedIcon);
+                                  }
+                                }}
+                                onError={(event) => {
+                                  const image = event.currentTarget;
+                                  const next = Number(image.dataset.fallbackIndex || "0");
+                                  if (next < fallbackIcons.length) {
+                                    image.dataset.fallbackIndex = String(next + 1);
+                                    image.src = fallbackIcons[next];
+                                  } else {
+                                    image.style.visibility = "hidden";
+                                  }
+                                }}
+                                className="w-5 h-5 shrink-0 rounded-sm"
+                              />
                               <span className="truncate text-[var(--text-secondary)]">{preset.label}</span>
                             </button>
                           );
