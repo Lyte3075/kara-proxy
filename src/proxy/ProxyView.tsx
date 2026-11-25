@@ -201,7 +201,7 @@ export default function ProxyView({
         try {
           await wakeRelay(candidate.url);
           if (cancelled) return;
-          setRelayStatus("Relay awake. Connecting…");
+          setRelayStatus("Wisp handshake complete. Connecting…");
           connectedController = await getScramjetController(candidate.url, relayToken);
           if (index > 0) {
             setRelayStatus("Switched to backup: " + candidate.name);
