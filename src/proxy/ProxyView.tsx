@@ -15,8 +15,6 @@ interface ProxyViewProps {
   relayToken: string;
   blockTrackers: boolean;
   blockedDomains: string[];
-  translateEnabled: boolean;
-  translateLanguage: string;
   loading: boolean;
   error: string | null;
   hidden?: boolean;
@@ -36,8 +34,6 @@ export default function ProxyView({
   relayToken,
   blockTrackers,
   blockedDomains,
-  translateEnabled,
-  translateLanguage,
   loading,
   error,
   hidden = false,
@@ -59,7 +55,6 @@ export default function ProxyView({
   const latestUrlRef = useRef(iframeUrl);
   const [slowLoad, setSlowLoad] = useState(false);
   const [relayStatus, setRelayStatus] = useState("");
-  const translationConfigRef = useRef({ enabled: translateEnabled, language: translateLanguage });
 
   filterConfigRef.current = { enabled: blockTrackers, blockedDomains };
   latestUrlRef.current = iframeUrl;
@@ -289,76 +284,6 @@ export default function ProxyView({
     readCurrentPage();
     return () => window.clearInterval(timer);
   }, [iframeUrl, hidden, onNavigate]);
-
-  // Reload the current document when translation preferences change. This
-  // cleanly restores the original page text when the user turns translation off.
-  useEffect(() => {
-    const previous = translationConfigRef.current;
-    const changed = previous.enabled !== translateEnabled || previous.language !== translateLanguage;
-    translationConfigRef.current = { enabled: translateEnabled, language: translateLanguage };
-    if (!changed) return;
-    try { iframeRef.current?.contentWindow?.location.reload(); } catch {}
-  }, [translateEnabled, translateLanguage]);
-
-  // Install Google's page-translation widget inside the proxied document.
-  // The widget is opt-in and is retried after same-tab navigation.
-  useEffect(() => {
-    if (!translateEnabled || !iframeUrl || hidden) return;
-    let disposed = false;
-    const installTranslation = () => {
-      if (disposed) return;
-      try {
-        const frameWindow = iframeRef.current?.contentWindow as (Window & {
-          google?: { translate?: { TranslateElement?: new (
-            options: { pageLanguage: string; includedLanguages: string; autoDisplay: boolean },
-            elementId: string
-          ) => unknown } };
-          googleTranslateElementInit?: () => void;
-        }) | null | undefined;
-        const doc = frameWindow?.document;
-        if (!frameWindow || !doc?.body) return;
-        if (doc.documentElement.dataset.karaTranslateLanguage === translateLanguage) return;
-
-        doc.getElementById("kara-google-translate")?.remove();
-        const container = doc.createElement("div");
-        container.id = "kara-google-translate";
-        container.style.cssText = "position:fixed;top:8px;right:8px;z-index:2147483647;padding:6px 8px;border-radius:10px;background:rgba(20,20,24,.92);box-shadow:0 2px 14px rgba(0,0,0,.35);max-width:calc(100vw - 16px)";
-        doc.body.appendChild(container);
-        doc.documentElement.dataset.karaTranslateLanguage = translateLanguage;
-
-        const initialize = () => {
-          const TranslateElement = frameWindow.google?.translate?.TranslateElement;
-          if (!TranslateElement || !doc.getElementById(container.id)) return;
-          new TranslateElement({
-            pageLanguage: doc.documentElement.lang || "en",
-            includedLanguages: translateLanguage,
-            autoDisplay: false,
-          }, container.id);
-        };
-        frameWindow.googleTranslateElementInit = initialize;
-
-        const existingScript = doc.querySelector<HTMLScriptElement>('script[data-kara-google-translate="true"]');
-        if (frameWindow.google?.translate?.TranslateElement) {
-          initialize();
-        } else if (!existingScript) {
-          const script = doc.createElement("script");
-          script.dataset.karaGoogleTranslate = "true";
-          script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-          script.async = true;
-          (doc.head || doc.body).appendChild(script);
-        }
-      } catch {
-        // Some sites isolate their document with cross-origin restrictions or
-        // a strict content-security policy. Do not interrupt normal browsing.
-      }
-    };
-    const timer = window.setInterval(installTranslation, 900);
-    installTranslation();
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, [translateEnabled, translateLanguage, iframeUrl, hidden]);
 
   useEffect(() => {
     setSlowLoad(false);
