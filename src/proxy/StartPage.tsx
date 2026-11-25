@@ -42,6 +42,15 @@ export default function StartPage({ shortcuts, bookmarks, onLaunch, onAddShortcu
           <Feature icon={<Lock size={16} />} title="Yours" desc="Deploy your own relay free" />
         </div>
 
+        {/* WebKit diagnostics */}
+        <div className="mb-10 rounded-2xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ borderColor: "var(--accent-soft)", background: "var(--bg-surface)" }}>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Safari compatibility check</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Run request-body and response-stream checks inside Kara's proxied browsing frame.</p>
+          </div>
+          <button onClick={() => onLaunch("https://cdn.jsdelivr.net/gh/Lyte3075/kara-proxy@42a58ca455238db8662512203b3acb6724405248/public/webkit-stream-test.html")} className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition hover:opacity-90" style={{ background: "linear-gradient(135deg, var(--accent-grad-from), var(--accent-grad-to))" }}>Run WebKit test</button>
+        </div>
+
         {/* Shortcuts */}
         <div className="mb-10">
           <SectionHeader title="Shortcuts" />
