@@ -64,6 +64,9 @@ export interface Settings {
   tabCloakEnabled: boolean;
   tabCloakTitle: string;
   tabCloakFavicon: string;
+  /** Translate proxied pages with the Google Translate website widget */
+  translateEnabled: boolean;
+  translateLanguage: string;
 }
 
 export const DEFAULT_RELAY = "wss://kara.prod.page/wisp/";
