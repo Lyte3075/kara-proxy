@@ -65,7 +65,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
   const [hovered, setHovered] = useState<Element | null>(null);
 
   const doc = iframeRef.current?.contentDocument ?? null;
-  const win = iframeRef.current?.contentWindow ?? null;
+  const win = (iframeRef.current?.contentWindow as (Window & typeof globalThis) | null) ?? null;
 
   const refresh = useCallback(() => {
     const frame = iframeRef.current;
@@ -74,8 +74,9 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
       const document = frame.contentDocument;
       if (!document) return;
       setRevision((value) => value + 1);
+      const pageEntries = Array.from(frame.contentWindow?.performance.getEntriesByType("resource") ?? []);
       setResources(
-        frame.contentWindow?.performance.getEntriesByType("resource") ?? []
+        pageEntries
           .map((entry) => entry as PerformanceResourceTiming)
           .filter((entry) => Boolean(entry.name))
           .slice(-250)
@@ -127,7 +128,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
     let restore = () => {};
     const install = () => {
       restore();
-      let pageWindow: Window;
+      let pageWindow: Window & typeof globalThis;
       try {
         const currentWindow = iframeRef.current?.contentWindow;
         if (!currentWindow) return;
@@ -243,7 +244,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
 
   const applyStyle = () => {
     if (!selected || !styleProperty.trim()) return;
-    selected.style.setProperty(styleProperty.trim(), styleValue);
+    (selected as HTMLElement).style.setProperty(styleProperty.trim(), styleValue);
     setRevision((value) => value + 1);
   };
 
