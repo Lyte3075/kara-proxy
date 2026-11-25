@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, Settings as SettingsIcon, HelpCircle, KeyRound, BarChart3 } from "lucide-react";
+import { Clock, Settings as SettingsIcon, HelpCircle, KeyRound, BarChart3, Bug } from "lucide-react";
+import SiteInspector from "@/proxy/SiteInspector";
 import AddressBar from "@/proxy/AddressBar";
 import ProxyView from "@/proxy/ProxyView";
 import HistoryPanel from "@/proxy/HistoryPanel";
@@ -21,7 +22,7 @@ import {
   normalizeInput, recordBlocked, recordRequest,
   saveBookmarks, saveCustomEngines, saveEncryptedVault, saveHistory, saveSettings,
   saveShortcuts, saveStats, saveCustomPalettes, saveSpeedTest,
-  applyCustomPalette, uid,
+  applyCustomPalette, uid, buildTranslatedPageUrl, restoreOriginalPageUrl,
 } from "@/proxy/utils";
 
 function applyTabFavicon(faviconUrl: string) {
@@ -94,6 +95,7 @@ function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [autofillPayload, setAutofillPayload] = useState<{ username: string; password: string; nonce: number } | null>(null);
 
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
@@ -166,23 +168,55 @@ function App() {
     const finalTarget = normalized ?? buildSearchUrl(searchEngine, rawTarget.trim());
     const newHistory = tab.navIdx < tab.history.length - 1 ? tab.history.slice(0, tab.navIdx + 1) : [...tab.history];
     newHistory.push(finalTarget);
-    updateTab(tabId, { url: finalTarget, iframeUrl: finalTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
+    const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(finalTarget, settings.translateLanguage) : finalTarget;
+    let initialTitle = finalTarget;
+    try { initialTitle = new URL(finalTarget).hostname.replace(/^www\\./, "") || finalTarget; } catch {}
+    updateTab(tabId, { title: initialTitle, url: finalTarget, iframeUrl: frameTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
     if (tabId === activeTabId) setInput(finalTarget);
     setStatsOpen(false); setHistoryOpen(false);
     setHistory((prev) => { const entry: HistoryEntry = { url: finalTarget, displayUrl: finalTarget.replace(/^https?:\/\//, ""), title: finalTarget.replace(/^https?:\/\//, ""), ts: Date.now() }; return [entry, ...prev.filter((h) => h.url !== finalTarget)].slice(0, 100); });
-  }, [tabs, activeTabId, searchEngine, updateTab]);
+  }, [tabs, activeTabId, searchEngine, settings.translateEnabled, settings.translateLanguage, updateTab]);
 
-  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
-  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
-  const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
+  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(t, settings.translateLanguage) : t; updateActiveTab({ navIdx: i, url: t, iframeUrl: frameTarget, loading: true, error: null }); setInput(t); }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
+  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(t, settings.translateLanguage) : t; updateActiveTab({ navIdx: i, url: t, iframeUrl: frameTarget, loading: true, error: null }); setInput(t); }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
+  const reload = useCallback(() => { if (activeTab.url) { updateActiveTab({ loading: true }); const c = settings.translateEnabled ? buildTranslatedPageUrl(activeTab.url, settings.translateLanguage) : activeTab.url; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
+  const handleProxiedNavigation = useCallback((tabId: string, url: string, title: string) => {
+    const pageUrl = restoreOriginalPageUrl(url);
+    setTabs((current) => current.map((tab) => {
+      if (tab.id !== tabId) return tab;
+      const history = tab.history.slice();
+      if (history[tab.navIdx] !== pageUrl) {
+        const nextHistory = history.slice(0, tab.navIdx + 1);
+        nextHistory.push(pageUrl);
+        return { ...tab, url: pageUrl, title, history: nextHistory, navIdx: nextHistory.length - 1, loading: false };
+      }
+      return { ...tab, url: pageUrl, title, loading: false };
+    }));
+    if (tabId === activeTabId && document.activeElement?.id !== "kara-address-input") setInput(pageUrl);
+    setHistory((current) => [{
+      url: pageUrl,
+      displayUrl: pageUrl.replace(/^https?:\/\//, ""),
+      title: title || pageUrl,
+      ts: Date.now(),
+    }, ...current.filter((entry) => entry.url !== pageUrl)].slice(0, 100));
+  }, [activeTabId]);
   const handleRelayChange = useCallback((endpoint: string) => setSettings((current) => ({ ...current, relay: endpoint })), []);
   const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
 
   /* ---------- settings & data ---------- */
-  const handleSaveSettings = useCallback((s: Settings) => setSettings(s), []);
+  const handleSaveSettings = useCallback((s: Settings) => {
+    const translationChanged = s.translateEnabled !== settings.translateEnabled || s.translateLanguage !== settings.translateLanguage;
+    setSettings(s);
+    if (translationChanged) {
+      setTabs((current) => current.map((tab) => {
+        if (tab.id !== activeTabId || !tab.url) return tab;
+        return { ...tab, iframeUrl: s.translateEnabled ? buildTranslatedPageUrl(tab.url, s.translateLanguage) : tab.url, loading: true, error: null };
+      }));
+    }
+  }, [activeTabId, settings.translateEnabled, settings.translateLanguage]);
   const addShortcut = useCallback((title: string, url: string) => setShortcuts((p) => [...p, { id: uid(), title, url }]), []);
   const removeShortcut = useCallback((id: string) => setShortcuts((p) => p.filter((s) => s.id !== id)), []);
   const addBookmark = useCallback((title: string, url: string) => setBookmarks((p) => [{ id: uid(), title, url, ts: Date.now() }, ...p]), []);
@@ -233,7 +267,7 @@ function App() {
   const handleAutofill = useCallback((e: VaultEntry) => { setAutofillPayload({ username: e.username, password: e.password, nonce: Date.now() }); setVaultOpen(false); }, []);
 
   /* ---------- derived ---------- */
-  const proxied = activeTab.iframeUrl ? (() => { try { return new URL(activeTab.iframeUrl).origin !== window.location.origin; } catch { return true; } })() : false;
+  const proxied = activeTab.url ? (() => { try { return new URL(activeTab.url).origin !== window.location.origin; } catch { return true; } })() : false;
   const blockedDomains = [...TRACKER_DOMAINS.filter((domain) => !stats.allowedDomains.includes(domain)), ...stats.customBlocklist];
   const canGoBack = activeTab.navIdx > 0;
   const canGoForward = activeTab.navIdx < activeTab.history.length - 1;
@@ -252,6 +286,9 @@ function App() {
         <div className="flex items-center gap-0.5 shrink-0">
           <IconButton label="Stats" onClick={() => { setStatsOpen((o) => !o); setHistoryOpen(false); }}>
             <BarChart3 size={18} className={statsOpen ? "text-[var(--accent)]" : ""} />
+          </IconButton>
+          <IconButton label="Inspector" onClick={() => { setInspectorOpen((open) => !open); setStatsOpen(false); setHistoryOpen(false); }}>
+            <Bug size={18} className={inspectorOpen ? "text-[var(--accent)]" : ""} />
           </IconButton>
           <IconButton label="Vault" onClick={() => setVaultOpen(true)}>
             <KeyRound size={18} className={vaultOpen ? "text-[var(--accent)]" : ""} />
@@ -278,21 +315,30 @@ function App() {
         <HistoryPanel open={historyOpen} history={history} onOpen={openHistoryEntry} onRemove={removeHistoryEntry} onClear={clearHistory} onClose={() => setHistoryOpen(false)} />
       ) : null}
 
-      <ProxyView
-        iframeUrl={activeTab.iframeUrl}
-        relay={settings.relay}
-        relayToken={settings.relayToken}
-        blockTrackers={settings.blockTrackers}
-        blockedDomains={blockedDomains}
-        loading={activeTab.loading}
-        error={activeTab.error}
-        hidden={showStartPage || statsOpen || historyOpen}
-        onLoad={handleLoad}
-        onError={handleProxyError}
-        onHome={handleHome}
-        onRelayChange={handleRelayChange}
-        autofillPayload={autofillPayload}
-      />
+      {tabs.map((tab) => (
+        <ProxyView
+          key={tab.id}
+          iframeUrl={tab.iframeUrl}
+          relay={settings.relay}
+          relayToken={settings.relayToken}
+          blockTrackers={settings.blockTrackers}
+          blockedDomains={blockedDomains}
+          loading={tab.loading}
+          error={tab.error}
+          hidden={tab.id !== activeTabId || showStartPage || statsOpen || historyOpen}
+          onLoad={() => updateTab(tab.id, { loading: false })}
+          onError={(message) => updateTab(tab.id, { loading: false, error: message })}
+          onHome={() => {
+            updateTab(tab.id, { url: null, iframeUrl: null, loading: false, error: null });
+            if (tab.id === activeTabId) setInput("");
+          }}
+          onNavigate={(url, title) => handleProxiedNavigation(tab.id, url, title)}
+          onRelayChange={handleRelayChange}
+          autofillPayload={tab.id === activeTabId ? autofillPayload : null}
+          inspectorOpen={tab.id === activeTabId && inspectorOpen}
+          onCloseInspector={() => setInspectorOpen(false)}
+        />
+      ))}
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}

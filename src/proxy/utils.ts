@@ -82,10 +82,12 @@ export function loadSettings(): Settings {
         tabCloakEnabled: p.tabCloakEnabled === true,
         tabCloakTitle: typeof p.tabCloakTitle === "string" ? p.tabCloakTitle : "",
         tabCloakFavicon: typeof p.tabCloakFavicon === "string" ? p.tabCloakFavicon : "",
+        translateEnabled: p.translateEnabled === true,
+        translateLanguage: typeof p.translateLanguage === "string" ? p.translateLanguage : "es",
       };
     }
   } catch {}
-  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS, tabCloakEnabled: false, tabCloakTitle: "", tabCloakFavicon: "" };
+  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS, tabCloakEnabled: false, tabCloakTitle: "", tabCloakFavicon: "", translateEnabled: false, translateLanguage: "es" };
 }
 
 export function saveSettings(settings: Settings): void {
@@ -128,6 +130,39 @@ export function getSearchEngine(id: string, custom: SearchEngine[] = []): Search
 }
 export function buildSearchUrl(engine: SearchEngine, query: string): string {
   return engine.searchUrl.replace("%s", encodeURIComponent(query));
+}
+
+/** Route a page through Google's translated-site host without changing the URL shown in Kara. */
+export function buildTranslatedPageUrl(target: string, language: string): string {
+  try {
+    const url = new URL(target);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return target;
+    if (url.hostname.endsWith(".translate.goog")) return target;
+    url.hostname = url.hostname.replace(/\./g, "-") + ".translate.goog";
+    url.searchParams.set("_x_tr_sl", "auto");
+    url.searchParams.set("_x_tr_tl", language);
+    url.searchParams.set("_x_tr_hl", language);
+    return url.href;
+  } catch {
+    return target;
+  }
+}
+
+/** Convert Google's translated-site URL back to the original page URL for Kara's address bar. */
+export function restoreOriginalPageUrl(target: string): string {
+  try {
+    const url = new URL(target);
+    const suffix = ".translate.goog";
+    if (!url.hostname.endsWith(suffix)) return target;
+    const translatedHost = url.hostname.slice(0, -suffix.length);
+    url.hostname = translatedHost.replace(/--/g, "\u0000").replace(/-/g, ".").replace(/\u0000/g, "-");
+    for (const key of ["_x_tr_sl", "_x_tr_tl", "_x_tr_hl", "_x_tr_pto", "_x_tr_sch", "_x_tr_hist"]) {
+      url.searchParams.delete(key);
+    }
+    return url.href;
+  } catch {
+    return target;
+  }
 }
 
 /* ---------- custom palettes ---------- */

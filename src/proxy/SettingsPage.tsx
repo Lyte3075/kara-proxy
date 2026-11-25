@@ -18,6 +18,7 @@ import {
   Plus,
   BarChart3,
   Eye,
+  Languages,
 } from "lucide-react";
 import type { Settings, BackupFile, EncryptedVault, HistoryEntry, Bookmark, SearchEngine, ProxyStats, ThemeColor, ThemeMode, CustomPalette } from "@/proxy/types";
 import { DEFAULT_RELAY, DEFAULT_RELAY_TOKEN, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
@@ -54,7 +55,7 @@ interface SettingsPageProps {
   onSelectPalette: (id: string | null) => void;
 }
 
-type Tab = "relay" | "search" | "appearance" | "cloaking" | "stats" | "data" | "vault";
+type Tab = "relay" | "search" | "translate" | "appearance" | "cloaking" | "stats" | "data" | "vault";
 
 const BUILT_IN_RELAYS = [
   { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/wisp/", addedAt: 0 },
@@ -116,6 +117,8 @@ export default function SettingsPage({
   const [tabCloakEnabled, setTabCloakEnabled] = useState(settings.tabCloakEnabled);
   const [tabCloakTitle, setTabCloakTitle] = useState(settings.tabCloakTitle);
   const [tabCloakFavicon, setTabCloakFavicon] = useState(settings.tabCloakFavicon);
+  const [translateEnabled, setTranslateEnabled] = useState(settings.translateEnabled);
+  const [translateLanguage, setTranslateLanguage] = useState(settings.translateLanguage || "es");
   const [tab, setTab] = useState<Tab>("relay");
   const [saved, setSaved] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -141,6 +144,8 @@ export default function SettingsPage({
     tabCloakEnabled !== settings.tabCloakEnabled ||
     tabCloakTitle !== settings.tabCloakTitle ||
     tabCloakFavicon !== settings.tabCloakFavicon ||
+    translateEnabled !== settings.translateEnabled ||
+    translateLanguage !== settings.translateLanguage ||
     settings.customPaletteId !== null;
 
   const handleSave = () => {
@@ -155,6 +160,8 @@ export default function SettingsPage({
       tabCloakEnabled,
       tabCloakTitle: tabCloakTitle.trim(),
       tabCloakFavicon: tabCloakFavicon.trim(),
+      translateEnabled,
+      translateLanguage,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -260,7 +267,7 @@ export default function SettingsPage({
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="relative z-20 flex shrink-0 items-center justify-between px-6 py-4 border-b"
           style={{ borderColor: "var(--border-primary)" }}
         >
           <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2 tracking-tight">
@@ -280,9 +287,10 @@ export default function SettingsPage({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 px-6 pt-4 overflow-x-auto scrollbar-thin">
+        <div className="relative z-20 flex shrink-0 flex-nowrap gap-1 px-6 pt-4 pb-3 overflow-x-auto scrollbar-thin border-b" style={{ borderColor: "var(--border-primary)", background: "var(--bg-elev)" }}>
           <TabBtn active={tab === "relay"} onClick={() => setTab("relay")} icon={<Server size={15} />}>Relay</TabBtn>
           <TabBtn active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={15} />}>Search</TabBtn>
+          <TabBtn active={tab === "translate"} onClick={() => setTab("translate")} icon={<Languages size={15} />}>Translate</TabBtn>
           <TabBtn active={tab === "appearance"} onClick={() => setTab("appearance")} icon={<Palette size={15} />}>Appearance</TabBtn>
           <TabBtn active={tab === "cloaking"} onClick={() => setTab("cloaking")} icon={<Eye size={15} />}>Cloaking</TabBtn>
           <TabBtn active={tab === "stats"} onClick={() => setTab("stats")} icon={<BarChart3 size={15} />}>Stats</TabBtn>
@@ -291,7 +299,7 @@ export default function SettingsPage({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
           {tab === "relay" && (
             <div className="space-y-4">
               <div>
@@ -491,6 +499,44 @@ export default function SettingsPage({
                 >
                   <Plus size={15} /> Add engine
                 </button>
+              </div>
+            </div>
+          )}
+
+          {tab === "translate" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border p-4 flex items-start gap-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <input
+                  id="kara-translate-enabled"
+                  type="checkbox"
+                  checked={translateEnabled}
+                  onChange={(event) => setTranslateEnabled(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+                />
+                <label htmlFor="kara-translate-enabled" className="cursor-pointer">
+                  <span className="block text-sm font-medium text-[var(--text-primary)]">Enable page translation</span>
+                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Routes pages through Google's translated-site service. Turn it off to return to direct proxy loading. Google fetches the translated copy, so this is less private than using Kara's relay alone.</span>
+                </label>
+              </div>
+              <div>
+                <label htmlFor="kara-translate-language" className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Translate pages into</label>
+                <select
+                  id="kara-translate-language"
+                  value={translateLanguage}
+                  onChange={(event) => setTranslateLanguage(event.target.value)}
+                  disabled={!translateEnabled}
+                  className="input disabled:opacity-50"
+                >
+                  {[
+                    ["es", "Spanish"], ["en", "English"], ["fr", "French"], ["de", "German"],
+                    ["it", "Italian"], ["pt", "Portuguese"], ["ja", "Japanese"], ["ko", "Korean"],
+                    ["zh-CN", "Chinese (Simplified)"], ["zh-TW", "Chinese (Traditional)"],
+                    ["ar", "Arabic"], ["hi", "Hindi"], ["ru", "Russian"], ["uk", "Ukrainian"],
+                    ["nl", "Dutch"], ["pl", "Polish"], ["tr", "Turkish"], ["vi", "Vietnamese"],
+                    ["th", "Thai"], ["id", "Indonesian"], ["sv", "Swedish"], ["he", "Hebrew"],
+                  ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                </select>
+                <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">Kara uses Google's translated-site proxy. It works best on public, text-heavy pages. Some interactive sites, sign-ins, and media players may not work correctly, and video audio is not translated.</p>
               </div>
             </div>
           )}
@@ -892,7 +938,7 @@ function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick:
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition border"
+      className="flex shrink-0 items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition border whitespace-nowrap"
       style={active
         ? { background: "var(--accent-glow)", color: "var(--accent-bright)", borderColor: "var(--accent-soft)" }
         : { color: "var(--text-muted)", borderColor: "transparent" }
