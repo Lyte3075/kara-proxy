@@ -31,7 +31,7 @@ export default function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: 
             <Globe size={12} className="text-[var(--text-faint)] shrink-0" />
           )}
           <span className="text-xs text-[var(--text-secondary)] truncate flex-1 min-w-0">
-            {tab.url ? hostnameOf(tab.url) : "New Tab"}
+            {tab.url ? (tab.title && tab.title !== "New Tab" ? tab.title : hostnameOf(tab.url)) : "New Tab"}
           </span>
           {tabs.length > 1 && (
             <button

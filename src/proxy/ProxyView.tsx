@@ -21,6 +21,7 @@ interface ProxyViewProps {
   onLoad: () => void;
   onError: (message: string) => void;
   onHome: () => void;
+  onNavigate: (url: string, title: string) => void;
   onRelayChange: (endpoint: string) => void;
   autofillPayload: { username: string; password: string; nonce: number } | null;
   inspectorOpen: boolean;
@@ -39,12 +40,15 @@ export default function ProxyView({
   onLoad,
   onError,
   onHome,
+  onNavigate,
   onRelayChange,
   autofillPayload,
   inspectorOpen,
   onCloseInspector,
 }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const callbacksRef = useRef({ onError, onRelayChange, onNavigate });
+  callbacksRef.current = { onError, onRelayChange, onNavigate };
   const frameRef = useRef<Frame | null>(null);
   const filterConfigRef = useRef<KaraFilterConfig>({
     enabled: blockTrackers,
@@ -68,7 +72,7 @@ export default function ProxyView({
       try {
         target = new URL(iframeUrl);
       } catch {
-        onError("That address is not a valid URL.");
+        callbacksRef.current.onError("That address is not a valid URL.");
         return;
       }
 
@@ -205,7 +209,7 @@ export default function ProxyView({
           connectedController = await getScramjetController(candidate.url, relayToken);
           if (index > 0) {
             setRelayStatus("Switched to backup: " + candidate.name);
-            onRelayChange(candidate.url);
+            callbacksRef.current.onRelayChange(candidate.url);
           }
           break;
         } catch (cause) {
@@ -218,7 +222,23 @@ export default function ProxyView({
         : new Error("No reachable Wisp relay is saved. Add another WSS endpoint in Settings.");
       if (cancelled || !iframeRef.current) return;
       if (!frameRef.current) {
-        frameRef.current = createKaraFrame(connectedController, iframeRef.current, () => filterConfigRef.current);
+        frameRef.current = createKaraFrame(
+          connectedController,
+          iframeRef.current,
+          () => filterConfigRef.current,
+          (url) => {
+            let title = "";
+            try {
+              title = iframeRef.current?.contentDocument?.title || "";
+            } catch {
+              // The document may be transitioning between proxied pages.
+            }
+            if (!title) {
+              try { title = new URL(url).hostname; } catch { title = "Loading page"; }
+            }
+            callbacksRef.current.onNavigate(url, title);
+          }
+        );
       }
       const latestUrl = latestUrlRef.current;
       if (!latestUrl) return;
@@ -229,7 +249,7 @@ export default function ProxyView({
       } catch (cause) {
         if (!cancelled) {
           setRelayStatus("");
-          onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
+          callbacksRef.current.onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
         }
       }
     };
@@ -239,7 +259,10 @@ export default function ProxyView({
       cancelled = true;
       relayProbeAbort.abort();
     };
-  }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
+  }, [iframeUrl, relay, relayToken]);
+
+  // Scramjet's URL watcher reports real navigations, SPA history changes,
+  // and hash changes directly. No iframe URL parsing or polling is needed.
 
   useEffect(() => {
     setSlowLoad(false);

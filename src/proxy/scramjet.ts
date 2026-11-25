@@ -86,20 +86,97 @@ export function createKaraFilterPlugin(
  * requires to be bodyless. Scramjet reconstructs these as native Responses,
  * which throws unless the body is null.
  */
-function createSafeTransport(wispUrl: string): LibcurlClient {
+function createSafeTransport(
+  wispUrl: string,
+  onRequestFailure?: (error: unknown) => void
+): LibcurlClient {
   const client = new LibcurlClient({ wisp: wispUrl });
 
   return new Proxy(client, {
     get(target, property, receiver) {
+      if (property === "connect") {
+        return (...args: Parameters<LibcurlClient["connect"]>) => {
+          let intentionallyClosed = false;
+          const originalClose = args[5];
+          const originalError = args[6];
+          const monitoredArgs: Parameters<LibcurlClient["connect"]> = [
+            args[0], args[1], args[2], args[3], args[4],
+            (code, reason) => {
+              if (!intentionallyClosed && code !== 1000 && code !== 1001) {
+                onRequestFailure?.(new Error("A proxied WebSocket closed unexpectedly (" + code + "): " + reason));
+              }
+              originalClose(code, reason);
+            },
+            (error) => {
+              if (!intentionallyClosed) onRequestFailure?.(new Error("A proxied WebSocket transport failed: " + error));
+              originalError(error);
+            },
+          ];
+          const [send, close] = target.connect(...monitoredArgs);
+          return [
+            send,
+            (code, reason) => {
+              intentionallyClosed = true;
+              close(code, reason);
+            },
+          ] as ReturnType<LibcurlClient["connect"]>;
+        };
+      }
+
       if (property === "request") {
         return async (...args: Parameters<LibcurlClient["request"]>) => {
-          const response = await target.request(...args);
-          if ([204, 205, 304].includes(response.status)) {
-            return { ...response, body: null } as unknown as Awaited<
-              ReturnType<LibcurlClient["request"]>
-            >;
+          try {
+            const response = await target.request(...args);
+            if ([204, 205, 304].includes(response.status)) {
+              return { ...response, body: null } as unknown as Awaited<
+                ReturnType<LibcurlClient["request"]>
+              >;
+            }
+
+            // A Wisp socket can die after response headers have arrived. In
+            // that case target.request() has already resolved, so the outer
+            // catch cannot see the failure. Observe the body stream itself and
+            // refresh the transport for future requests if reading it fails.
+            if (typeof ReadableStream !== "undefined" && response.body instanceof ReadableStream) {
+              const reader = response.body.getReader();
+              let finished = false;
+              const monitoredBody = new ReadableStream<Uint8Array>({
+                async pull(streamController) {
+                  if (finished) return;
+                  try {
+                    const result = await reader.read();
+                    if (result.done) {
+                      finished = true;
+                      reader.releaseLock();
+                      streamController.close();
+                    } else {
+                      streamController.enqueue(result.value);
+                    }
+                  } catch (error) {
+                    finished = true;
+                    try { reader.releaseLock(); } catch {}
+                    onRequestFailure?.(error);
+                    streamController.error(error);
+                  }
+                },
+                async cancel(reason) {
+                  finished = true;
+                  try { await reader.cancel(reason); } catch {}
+                },
+              });
+              return { ...response, body: monitoredBody } as unknown as Awaited<
+                ReturnType<LibcurlClient["request"]>
+              >;
+            }
+            return response;
+          } catch (error) {
+            // An aborted navigation is expected and should not trigger a
+            // transport reset. Other network failures may mean the Wisp
+            // session died while Safari suspended or changed networks.
+            const signal = args[4];
+            if (!signal?.aborted) onRequestFailure?.(error);
+            throw error;
           }
-          return response;
         };
       }
 
@@ -109,8 +186,11 @@ function createSafeTransport(wispUrl: string): LibcurlClient {
   });
 }
 
-async function createInitializedTransport(wispUrl: string): Promise<LibcurlClient> {
-  const transport = createSafeTransport(wispUrl);
+async function createInitializedTransport(
+  wispUrl: string,
+  onRequestFailure?: (error: unknown) => void
+): Promise<LibcurlClient> {
+  const transport = createSafeTransport(wispUrl, onRequestFailure);
   let timeout: number | undefined;
 
   try {
@@ -161,8 +241,66 @@ export function normalizeWispEndpoint(endpoint: string, token: string): string {
 }
 
 let controllerPromise: Promise<Controller> | null = null;
+let activeController: Controller | null = null;
 let activeWispUrl = "";
 let serviceWorkerKeepalive: number | null = null;
+let transportRecoveryPromise: Promise<void> | null = null;
+let lastTransportRecoveryAt = 0;
+let recoveryListenersInstalled = false;
+
+function recoverActiveTransport(reason: string, force = false): Promise<void> {
+  if (!activeController || !activeWispUrl || !navigator.onLine) {
+    return Promise.resolve();
+  }
+  if (transportRecoveryPromise) return transportRecoveryPromise;
+
+  // Avoid rebuilding libcurl sessions repeatedly when many requests fail
+  // together, or when iOS emits several resume/network events in a row.
+  const now = Date.now();
+  if (!force && now - lastTransportRecoveryAt < 10000) return Promise.resolve();
+  lastTransportRecoveryAt = now;
+
+  const controller = activeController;
+  const endpoint = activeWispUrl;
+  console.warn("[Kara] Recovering the Wisp transport:", reason);
+
+  const recovery = (async () => {
+    const transport = await createInitializedTransport(
+      endpoint,
+      (error) => { void recoverActiveTransport(error instanceof Error ? error.message : "request failed", true); }
+    );
+    // The user may have switched relays while this replacement was starting.
+    if (activeController === controller && activeWispUrl === endpoint) {
+      controller.setTransport(transport);
+      console.info("[Kara] Wisp transport replaced successfully.");
+    }
+  })();
+
+  const wrapped = recovery.catch((error) => {
+    console.warn("[Kara] Wisp transport recovery failed:", error);
+  }).finally(() => {
+    if (transportRecoveryPromise === wrapped) transportRecoveryPromise = null;
+  });
+  transportRecoveryPromise = wrapped;
+  return wrapped;
+}
+
+function installTransportRecoveryListeners(): void {
+  if (recoveryListenersInstalled) return;
+  recoveryListenersInstalled = true;
+
+  window.addEventListener("online", () => {
+    void recoverActiveTransport("network connection restored");
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) void recoverActiveTransport("Safari restored Kara from the page cache");
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void recoverActiveTransport("Kara became visible again");
+    }
+  });
+}
 
 async function initializeController(wispUrl: string): Promise<Controller> {
   // Fail early with actionable messages instead of a generic blank loading screen.
@@ -238,7 +376,10 @@ async function initializeController(wispUrl: string): Promise<Controller> {
   // LibcurlClient does not create its HTTPSession in the constructor.
   // Initialize it before handing it to Scramjet, or the first proxied request
   // reaches an undefined session and fails.
-  const transport = await createInitializedTransport(wispUrl);
+  const transport = await createInitializedTransport(
+    wispUrl,
+    (error) => { void recoverActiveTransport(error instanceof Error ? error.message : "request failed"); }
+  );
   const controller = new Controller({
     serviceworker,
     transport,
@@ -252,6 +393,9 @@ async function initializeController(wispUrl: string): Promise<Controller> {
   });
 
   await controller.wait();
+  activeController = controller;
+  lastTransportRecoveryAt = Date.now();
+  installTransportRecoveryListeners();
 
   // Scramjet currently keeps its frame-routing table in service-worker memory.
   // Some browsers terminate an idle worker and lose that table, so keep the
@@ -288,19 +432,50 @@ export async function getScramjetController(
 
   const controller = await controllerPromise;
   if (activeWispUrl !== wispUrl) {
-    const transport = await createInitializedTransport(wispUrl);
+    const transport = await createInitializedTransport(
+      wispUrl,
+      (error) => { void recoverActiveTransport(error instanceof Error ? error.message : "request failed"); }
+    );
     controller.setTransport(transport);
     activeWispUrl = wispUrl;
+    lastTransportRecoveryAt = Date.now();
   }
   return controller;
+}
+
+class KaraUrlWatcherPlugin extends ManagedPlugin {
+  constructor(private readonly onUrlChange: (url: string) => void) {
+    super("kara-url-watcher", []);
+  }
+
+  override install(frame: Frame): void {
+    super.install(frame);
+
+    this.tap(frame.hooks.init.post, (context) => {
+      if (!context.isTopLevel) return;
+
+      const notify = () => this.onUrlChange(context.client.url.href);
+      notify();
+
+      this.tap(context.client.hooks.lifecycle.navigate, (_context, props) => {
+        this.onUrlChange(props.url);
+      });
+
+      context.window.addEventListener("hashchange", notify, { capture: true });
+    });
+  }
 }
 
 export function createKaraFrame(
   controller: Controller,
   iframe: HTMLIFrameElement,
-  getFilterConfig: () => KaraFilterConfig
+  getFilterConfig: () => KaraFilterConfig,
+  onUrlChange: (url: string) => void = () => {}
 ): Frame {
   return controller.createFrame(iframe, {
-    plugins: [createKaraFilterPlugin(getFilterConfig)],
+    plugins: [
+      createKaraFilterPlugin(getFilterConfig),
+      new KaraUrlWatcherPlugin(onUrlChange),
+    ],
   });
 }
