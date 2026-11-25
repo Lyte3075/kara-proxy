@@ -47,6 +47,8 @@ export default function ProxyView({
   onCloseInspector,
 }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const callbacksRef = useRef({ onError, onRelayChange, onNavigate });
+  callbacksRef.current = { onError, onRelayChange, onNavigate };
   const frameRef = useRef<Frame | null>(null);
   const filterConfigRef = useRef<KaraFilterConfig>({
     enabled: blockTrackers,
@@ -70,7 +72,7 @@ export default function ProxyView({
       try {
         target = new URL(iframeUrl);
       } catch {
-        onError("That address is not a valid URL.");
+        callbacksRef.current.onError("That address is not a valid URL.");
         return;
       }
 
@@ -207,7 +209,7 @@ export default function ProxyView({
           connectedController = await getScramjetController(candidate.url, relayToken);
           if (index > 0) {
             setRelayStatus("Switched to backup: " + candidate.name);
-            onRelayChange(candidate.url);
+            callbacksRef.current.onRelayChange(candidate.url);
           }
           break;
         } catch (cause) {
@@ -231,7 +233,7 @@ export default function ProxyView({
       } catch (cause) {
         if (!cancelled) {
           setRelayStatus("");
-          onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
+          callbacksRef.current.onError(cause instanceof Error ? cause.message : "Could not initialize Scramjet.");
         }
       }
     };
@@ -241,7 +243,7 @@ export default function ProxyView({
       cancelled = true;
       relayProbeAbort.abort();
     };
-  }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
+  }, [iframeUrl, relay, relayToken]);
 
   // Keep Kara's browser chrome synchronized with Scramjet's virtual page.
   // Safari can briefly expose about:blank while the controller is attaching
@@ -294,13 +296,13 @@ export default function ProxyView({
       if (targetUrl !== lastUrl || title !== lastTitle) {
         lastUrl = targetUrl;
         lastTitle = title;
-        onNavigate(targetUrl, title);
+        callbacksRef.current.onNavigate(targetUrl, title);
       }
     };
     const timer = window.setInterval(readCurrentPage, 400);
     readCurrentPage();
     return () => window.clearInterval(timer);
-  }, [iframeUrl, hidden, onNavigate]);
+  }, [iframeUrl, hidden]);
 
   useEffect(() => {
     setSlowLoad(false);
