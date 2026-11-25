@@ -59,18 +59,18 @@ const karaCanTransferReadableStream = (() => {
       if (!api.includes('fetchresponse.body')) {
         throw new Error('Kara could not locate the Scramjet response-transfer code. Build stopped rather than shipping a partial WebKit fix.');
       }
-      const bodyPattern = /body:\\s*fetchresponse\\.body/;
+      const returnPattern = /return\\s*\\[\\s*\\{\\s*body:\\s*fetchresponse\\.body/;
       const transferPattern = /fetchresponse\\.body\\s+instanceof\\s+ReadableStream\\s*\\|\\|\\s*fetchresponse\\.body\\s+instanceof\\s+ArrayBuffer\\s*\\?\\s*\\[fetchresponse\\.body\\]\\s*:\\s*\\[\\]/;
-      if (!bodyPattern.test(api) || !transferPattern.test(api)) {
+      if (!returnPattern.test(api) || !transferPattern.test(api)) {
         throw new Error('Kara found the Scramjet controller but its response-transfer code differs from the expected version. Build stopped for safety.');
       }
       api = api.replace(
-        bodyPattern,
-        'body: (fetchresponse.body instanceof ReadableStream && !karaCanTransferReadableStream ? await fetchresponse.arrayBuffer() : fetchresponse.body)'
+        returnPattern,
+        'const responseBody = fetchresponse.body instanceof ReadableStream && !karaCanTransferReadableStream ? await fetchresponse.arrayBuffer() : fetchresponse.body; return [{ body: responseBody'
       );
       api = api.replace(
         transferPattern,
-        'fetchresponse.body instanceof ReadableStream && !karaCanTransferReadableStream ? [fetchresponse.body] : (fetchresponse.body instanceof ReadableStream || fetchresponse.body instanceof ArrayBuffer ? [fetchresponse.body] : [])'
+        '[responseBody]'
       );
       if (!api.includes('karaCanTransferReadableStream')) {
         const marker = 'class Controller';
