@@ -169,7 +169,9 @@ function App() {
     const newHistory = tab.navIdx < tab.history.length - 1 ? tab.history.slice(0, tab.navIdx + 1) : [...tab.history];
     newHistory.push(finalTarget);
     const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(finalTarget, settings.translateLanguage) : finalTarget;
-    updateTab(tabId, { url: finalTarget, iframeUrl: frameTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
+    let initialTitle = finalTarget;
+    try { initialTitle = new URL(finalTarget).hostname.replace(/^www\\./, "") || finalTarget; } catch {}
+    updateTab(tabId, { title: initialTitle, url: finalTarget, iframeUrl: frameTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
     if (tabId === activeTabId) setInput(finalTarget);
     setStatsOpen(false); setHistoryOpen(false);
     setHistory((prev) => { const entry: HistoryEntry = { url: finalTarget, displayUrl: finalTarget.replace(/^https?:\/\//, ""), title: finalTarget.replace(/^https?:\/\//, ""), ts: Date.now() }; return [entry, ...prev.filter((h) => h.url !== finalTarget)].slice(0, 100); });
