@@ -59,8 +59,8 @@ const karaCanTransferReadableStream = (() => {
       if (!api.includes('fetchresponse.body')) {
         throw new Error('Kara could not locate the Scramjet response-transfer code. Build stopped rather than shipping a partial WebKit fix.');
       }
-      const returnPattern = /return\\s*\\[\\s*\\{\\s*body:\\s*fetchresponse\\.body/;
-      const transferPattern = /fetchresponse\\.body\\s+instanceof\\s+ReadableStream\\s*\\|\\|\\s*fetchresponse\\.body\\s+instanceof\\s+ArrayBuffer\\s*\\?\\s*\\[fetchresponse\\.body\\]\\s*:\\s*\\[\\]/;
+      const returnPattern = /return\s*\[\s*\{\s*body:\s*fetchresponse\.body/;
+      const transferPattern = /fetchresponse\.body\s+instanceof\s+ReadableStream\s*\|\|\s*fetchresponse\.body\s+instanceof\s+ArrayBuffer\s*\?\s*\[fetchresponse\.body\]\s*:\s*\[\]/;
       if (!returnPattern.test(api) || !transferPattern.test(api)) {
         throw new Error('Kara found the Scramjet controller but its response-transfer code differs from the expected version. Build stopped for safety.');
       }
