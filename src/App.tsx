@@ -252,12 +252,48 @@ function App() {
   /* ---------- speed test ---------- */
   const handleSpeedTest = useCallback((result: SpeedTestResult) => { setSpeedTests(saveSpeedTest(result)); }, []);
 
-  const resetAll = useCallback(() => {
+  const resetAll = useCallback(async () => {
     setHistory([]); setBookmarks([]); setShortcuts([]); setEncryptedVault(null); setVaultEntries(null);
     setCustomEngines([]); setCustomPalettes([]);
     setStats({ bytesDownloaded: 0, requestsMade: 0, blockedRequests: 0, sessionStart: Date.now(), speedSamples: [], recentBlocks: [], customBlocklist: [], allowedDomains: [] });
     setSpeedTests([]);
-    localStorage.clear();
+
+    // Remove every browser-managed storage layer available to this origin.
+    // Safari does not expose an API for clearing its own cookies/site-data UI.
+    try {
+      if ("caches" in window) {
+        const cacheNames = await window.caches.keys();
+        await Promise.all(cacheNames.map((name) => window.caches.delete(name)));
+      }
+    } catch (error) {
+      console.warn("[Kara] Could not clear every Cache Storage entry.", error);
+    }
+
+    try {
+      const registrations = await navigator.serviceWorker?.getRegistrations();
+      await Promise.all((registrations ?? []).map((registration) => registration.unregister()));
+    } catch (error) {
+      console.warn("[Kara] Could not unregister every service worker.", error);
+    }
+
+    try {
+      const idb = indexedDB as IDBFactory & { databases?: () => Promise<Array<{ name?: string | null }>> };
+      const databases = await idb.databases?.();
+      await Promise.all((databases ?? []).map((database) => {
+        if (!database.name) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const request = indexedDB.deleteDatabase(database.name!);
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve();
+          request.onblocked = () => resolve();
+        });
+      }));
+    } catch (error) {
+      console.warn("[Kara] Could not enumerate or clear every IndexedDB database.", error);
+    }
+
+    try { localStorage.clear(); } catch {}
+    try { sessionStorage.clear(); } catch {}
     window.location.reload();
   }, []);
 
