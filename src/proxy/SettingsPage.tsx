@@ -546,7 +546,7 @@ export default function SettingsPage({
               <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Color theme</label>
                 <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">Choose the accent color for the interface.</p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {THEME_COLORS.map((tc) => (
                     <button
                       key={tc.id}
@@ -932,6 +932,7 @@ function themeSwatch(color: ThemeColor): string {
     green: "linear-gradient(135deg, #16a34a, #14532d)",
     amber: "linear-gradient(135deg, #d97706, #92400e)",
     violet: "linear-gradient(135deg, #9333ea, #5b21b6)",
+    black: "linear-gradient(135deg, #ffffff, #000000)",
   };
   return map[color];
 }
