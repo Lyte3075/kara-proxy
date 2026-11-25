@@ -98,6 +98,22 @@
   --btn-hover: rgba(91,33,182,0.3);
 }
 
+/* ---- Lyte: monochrome black with white accents ---- */
+
+[data-theme-mode="dark"][data-theme-color="black"],
+[data-theme-mode="light"][data-theme-color="black"] {
+  --bg-base: #000000; --bg-elev: #080808;
+  --bg-input: rgba(255,255,255,0.06); --bg-surface: rgba(255,255,255,0.035);
+  --border-primary: rgba(255,255,255,0.28); --border-subtle: rgba(255,255,255,0.16);
+  --border-faint: rgba(255,255,255,0.1); --border-dashed: rgba(255,255,255,0.2);
+  --accent: #ffffff; --accent-bright: #ffffff; --accent-hover: #d4d4d4;
+  --accent-soft: rgba(255,255,255,0.5); --accent-tint: rgba(255,255,255,0.16);
+  --accent-glow: rgba(255,255,255,0.12); --accent-grad-from: #ffffff; --accent-grad-to: #d4d4d4;
+  --accent-shadow: rgba(255,255,255,0.12); --accent-shadow-strong: rgba(255,255,255,0.2);
+  --text-primary: #ffffff; --text-secondary: #e5e5e5; --text-muted: #a3a3a3; --text-faint: #737373;
+  --text-on-accent: #000000; --btn-hover: rgba(255,255,255,0.1);
+}
+
 /* ---- Light modes ---- */
 
 [data-theme-mode="light"][data-theme-color="red"] {
