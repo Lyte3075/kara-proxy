@@ -82,10 +82,12 @@ export function loadSettings(): Settings {
         tabCloakEnabled: p.tabCloakEnabled === true,
         tabCloakTitle: typeof p.tabCloakTitle === "string" ? p.tabCloakTitle : "",
         tabCloakFavicon: typeof p.tabCloakFavicon === "string" ? p.tabCloakFavicon : "",
+        translateEnabled: p.translateEnabled === true,
+        translateLanguage: typeof p.translateLanguage === "string" ? p.translateLanguage : "es",
       };
     }
   } catch {}
-  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS, tabCloakEnabled: false, tabCloakTitle: "", tabCloakFavicon: "" };
+  return { relay: DEFAULT_RELAY, relayToken: DEFAULT_RELAY_TOKEN, searchEngineId: DEFAULT_SEARCH_ENGINE_ID, themeColor: DEFAULT_THEME_COLOR, themeMode: DEFAULT_THEME_MODE, customPaletteId: null, blockTrackers: DEFAULT_BLOCK_TRACKERS, tabCloakEnabled: false, tabCloakTitle: "", tabCloakFavicon: "", translateEnabled: false, translateLanguage: "es" };
 }
 
 export function saveSettings(settings: Settings): void {
