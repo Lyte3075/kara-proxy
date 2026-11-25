@@ -182,10 +182,10 @@ function App() {
   const reload = useCallback(() => { if (activeTab.url) { updateActiveTab({ loading: true }); const c = settings.translateEnabled ? buildTranslatedPageUrl(activeTab.url, settings.translateLanguage) : activeTab.url; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
-  const handleProxiedNavigation = useCallback((url: string, title: string) => {
+  const handleProxiedNavigation = useCallback((tabId: string, url: string, title: string) => {
     const pageUrl = restoreOriginalPageUrl(url);
     setTabs((current) => current.map((tab) => {
-      if (tab.id !== activeTabId) return tab;
+      if (tab.id !== tabId) return tab;
       const history = tab.history.slice();
       if (history[tab.navIdx] !== pageUrl) {
         const nextHistory = history.slice(0, tab.navIdx + 1);
@@ -194,7 +194,7 @@ function App() {
       }
       return { ...tab, url: pageUrl, title, loading: false };
     }));
-    if (document.activeElement?.id !== "kara-address-input") setInput(pageUrl);
+    if (tabId === activeTabId && document.activeElement?.id !== "kara-address-input") setInput(pageUrl);
     setHistory((current) => [{
       url: pageUrl,
       displayUrl: pageUrl.replace(/^https?:\/\//, ""),
@@ -315,24 +315,30 @@ function App() {
         <HistoryPanel open={historyOpen} history={history} onOpen={openHistoryEntry} onRemove={removeHistoryEntry} onClear={clearHistory} onClose={() => setHistoryOpen(false)} />
       ) : null}
 
-      <ProxyView
-        iframeUrl={activeTab.iframeUrl}
-        relay={settings.relay}
-        relayToken={settings.relayToken}
-        blockTrackers={settings.blockTrackers}
-        blockedDomains={blockedDomains}
-        loading={activeTab.loading}
-        error={activeTab.error}
-        hidden={showStartPage || statsOpen || historyOpen}
-        onLoad={handleLoad}
-        onError={handleProxyError}
-        onHome={handleHome}
-        onNavigate={handleProxiedNavigation}
-        onRelayChange={handleRelayChange}
-        autofillPayload={autofillPayload}
-        inspectorOpen={inspectorOpen}
-        onCloseInspector={() => setInspectorOpen(false)}
-      />
+      {tabs.map((tab) => (
+        <ProxyView
+          key={tab.id}
+          iframeUrl={tab.iframeUrl}
+          relay={settings.relay}
+          relayToken={settings.relayToken}
+          blockTrackers={settings.blockTrackers}
+          blockedDomains={blockedDomains}
+          loading={tab.loading}
+          error={tab.error}
+          hidden={tab.id !== activeTabId || showStartPage || statsOpen || historyOpen}
+          onLoad={() => updateTab(tab.id, { loading: false })}
+          onError={(message) => updateTab(tab.id, { loading: false, error: message })}
+          onHome={() => {
+            updateTab(tab.id, { url: null, iframeUrl: null, loading: false, error: null });
+            if (tab.id === activeTabId) setInput("");
+          }}
+          onNavigate={(url, title) => handleProxiedNavigation(tab.id, url, title)}
+          onRelayChange={handleRelayChange}
+          autofillPayload={tab.id === activeTabId ? autofillPayload : null}
+          inspectorOpen={tab.id === activeTabId && inspectorOpen}
+          onCloseInspector={() => setInspectorOpen(false)}
+        />
+      ))}
 
       <SettingsPage
         open={settingsOpen} settings={settings} history={history} bookmarks={bookmarks} vault={encryptedVault} customEngines={customEngines} stats={stats}
