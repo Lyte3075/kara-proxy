@@ -27,7 +27,7 @@ function scramjetCompatibilityPatches() {
     canTransferReadableStream = false;
   }
 
-  if (canTransferReadableStream || !globalThis.MessagePort) return;
+  if (!globalThis.MessagePort) return;
 
   const nativePostMessage = MessagePort.prototype.postMessage;
   const pendingByPort = new WeakMap();
@@ -81,6 +81,27 @@ function scramjetCompatibilityPatches() {
     return copy;
   }
 
+  function collectStreams(value, found = [], seen = new WeakSet()) {
+    if (value === null || typeof value !== 'object' || seen.has(value)) return found;
+    seen.add(value);
+
+    if (typeof ReadableStream !== 'undefined' && value instanceof ReadableStream) {
+      if (!found.includes(value)) found.push(value);
+      return found;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) collectStreams(item, found, seen);
+      return found;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype === Object.prototype || prototype === null) {
+      for (const key of Object.keys(value)) collectStreams(value[key], found, seen);
+    }
+    return found;
+  }
+
   MessagePort.prototype.postMessage = function(data, transferOrOptions) {
     // Support both postMessage(message, transferList) and the newer
     // postMessage(message, { transfer: transferList }) overload.
@@ -92,15 +113,32 @@ function scramjetCompatibilityPatches() {
       : (usesOptions && Array.isArray(transferOrOptions.transfer)
         ? transferOrOptions.transfer
         : []);
-    const streams = transfer.filter(item =>
-      typeof ReadableStream !== 'undefined' && item instanceof ReadableStream
-    );
+    const streams = collectStreams(data);
+    for (const item of transfer) {
+      if (typeof ReadableStream !== 'undefined' &&
+          item instanceof ReadableStream && !streams.includes(item)) {
+        streams.push(item);
+      }
+    }
+
+    // Scramjet's RPC request path can include a body stream in its payload
+    // without explicitly listing it in the transfer array. Add it on browsers
+    // with native stream transfer, or buffer it for WebKit below.
+    const missingTransfers = streams.filter(stream => !transfer.includes(stream));
+    const nativeTransfer = [...transfer, ...missingTransfers];
+    const makeTransferArgument = items => usesOptions
+      ? { ...transferOrOptions, transfer: items }
+      : items;
+
+    if (streams.length === 0) {
+      return nativePostMessage.call(this, data, transferOrOptions);
+    }
+
+    if (canTransferReadableStream) {
+      return nativePostMessage.call(this, data, makeTransferArgument(nativeTransfer));
+    }
 
     const send = async () => {
-      if (streams.length === 0) {
-        return nativePostMessage.call(this, data, transferOrOptions);
-      }
-
       const replacements = new Map();
       for (const stream of streams) {
         replacements.set(stream, await streamToArrayBuffer(stream));
@@ -110,17 +148,10 @@ function scramjetCompatibilityPatches() {
       const nextTransfer = transfer.map(item =>
         replacements.has(item) ? replacements.get(item) : item
       );
-      const nextTransferArgument = usesOptions
-        ? { ...transferOrOptions, transfer: nextTransfer }
-        : nextTransfer;
-      return nativePostMessage.call(this, nextData, nextTransferArgument);
+      return nativePostMessage.call(this, nextData, makeTransferArgument(nextTransfer));
     };
 
     const previous = pendingByPort.get(this);
-    if (!previous && streams.length === 0) {
-      return nativePostMessage.call(this, data, transferOrOptions);
-    }
-
     const task = (previous || Promise.resolve()).then(send);
     pendingByPort.set(this, task.catch(error => {
       console.error('Kara Scramjet stream-transfer fallback failed:', error);
