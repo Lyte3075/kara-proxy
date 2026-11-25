@@ -263,7 +263,7 @@ export default function ProxyView({
         if (markerIndex >= 0) {
           const encodedTarget = frameLocation.pathname.slice(markerIndex + marker.length);
           const decodedTarget = decodeURIComponent(encodedTarget);
-          targetUrl = new URL(decodedTarget).href;
+          targetUrl = new URL(decodedTarget + frameLocation.search + frameLocation.hash).href;
         } else if (frameLocation.origin !== window.location.origin) {
           targetUrl = frameLocation.href;
         }
