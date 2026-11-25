@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RefObject } from "react";
 import {
-  Braces, Bug, ChevronDown, ChevronRight, Code2, Copy, Download,
-  Eye, FileCode2, Gauge, Globe, Layers, Monitor, Network, Smartphone,
-  Tablet, Terminal, X,
+  Braces, Bug, ChevronDown, ChevronRight, Copy, FileCode2, Gauge,
+  Layers, Monitor, Network, Smartphone, Tablet, Terminal, X,
 } from "lucide-react";
 
 type InspectorTab = "elements" | "console" | "network" | "sources" | "styles" | "device";
@@ -76,9 +75,9 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
       if (!document) return;
       setRevision((value) => value + 1);
       setResources(
-        performance.getEntriesByType("resource")
+        frame.contentWindow?.performance.getEntriesByType("resource") ?? []
           .map((entry) => entry as PerformanceResourceTiming)
-          .filter((entry) => entry.name.includes(window.location.host) || entry.name.startsWith("blob:") || entry.name.startsWith("data:"))
+          .filter((entry) => Boolean(entry.name))
           .slice(-250)
           .reverse()
           .map((entry) => ({
@@ -124,38 +123,54 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
   }, [open, iframeRef, refresh]);
 
   useEffect(() => {
-    if (!open || !win) return;
-    let pageWindow: Window;
-    try { pageWindow = win; void pageWindow.document.documentElement; } catch { return; }
-    const pageConsole = pageWindow.console;
-    const originals: Record<string, (...args: unknown[]) => void> = {};
-    const add = (level: string, args: unknown[]) => {
-      setConsoleEntries((prev) => [...prev.slice(-299), {
-        id: Date.now() + Math.random(),
-        level,
-        text: args.map(safeText).join(" "),
-        time: new Date().toLocaleTimeString(),
-      }]);
-    };
-    (["log", "info", "warn", "error", "debug"] as const).forEach((level) => {
-      originals[level] = pageConsole[level].bind(pageConsole) as (...args: unknown[]) => void;
-      pageConsole[level] = (...args: unknown[]) => {
-        originals[level](...args);
-        add(level, args);
+    if (!open || !iframeRef.current) return;
+    let restore = () => {};
+    const install = () => {
+      restore();
+      let pageWindow: Window;
+      try {
+        const currentWindow = iframeRef.current?.contentWindow;
+        if (!currentWindow) return;
+        pageWindow = currentWindow;
+        void pageWindow.document.documentElement;
+      } catch { return; }
+      const pageConsole = pageWindow.console;
+      const originals: Record<string, (...args: unknown[]) => void> = {};
+      const add = (level: string, args: unknown[]) => {
+        setConsoleEntries((prev) => [...prev.slice(-299), {
+          id: Date.now() + Math.random(),
+          level,
+          text: args.map(safeText).join(" "),
+          time: new Date().toLocaleTimeString(),
+        }]);
       };
-    });
-    const onError = (event: ErrorEvent) => add("error", [event.message + (event.filename ? " (" + event.filename + ":" + event.lineno + ")" : "")]);
-    const onReject = (event: PromiseRejectionEvent) => add("error", ["Unhandled promise rejection:", event.reason]);
-    pageWindow.addEventListener("error", onError);
-    pageWindow.addEventListener("unhandledrejection", onReject);
-    return () => {
       (["log", "info", "warn", "error", "debug"] as const).forEach((level) => {
-        pageConsole[level] = originals[level] as Console[typeof level];
+        originals[level] = pageConsole[level].bind(pageConsole) as (...args: unknown[]) => void;
+        pageConsole[level] = (...args: unknown[]) => {
+          originals[level](...args);
+          add(level, args);
+        };
       });
-      pageWindow.removeEventListener("error", onError);
-      pageWindow.removeEventListener("unhandledrejection", onReject);
+      const onError = (event: ErrorEvent) => add("error", [event.message + (event.filename ? " (" + event.filename + ":" + event.lineno + ")" : "")]);
+      const onReject = (event: PromiseRejectionEvent) => add("error", ["Unhandled promise rejection:", event.reason]);
+      pageWindow.addEventListener("error", onError);
+      pageWindow.addEventListener("unhandledrejection", onReject);
+      restore = () => {
+        (["log", "info", "warn", "error", "debug"] as const).forEach((level) => {
+          pageConsole[level] = originals[level] as Console[typeof level];
+        });
+        pageWindow.removeEventListener("error", onError);
+        pageWindow.removeEventListener("unhandledrejection", onReject);
+      };
     };
-  }, [open, win, revision]);
+    const frame = iframeRef.current;
+    frame.addEventListener("load", install);
+    install();
+    return () => {
+      frame.removeEventListener("load", install);
+      restore();
+    };
+  }, [open, iframeRef]);
 
   useEffect(() => {
     const frame = iframeRef.current;
