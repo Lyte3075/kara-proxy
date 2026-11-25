@@ -193,7 +193,7 @@ function App() {
     if (document.activeElement?.id !== "kara-address-input") setInput(url);
     setHistory((current) => [{
       url,
-      displayUrl: url.replace(/^https?:\\/\\//, ""),
+      displayUrl: url.replace(/^https?:\/\//, ""),
       title: title || url,
       ts: Date.now(),
     }, ...current.filter((entry) => entry.url !== url)].slice(0, 100));
