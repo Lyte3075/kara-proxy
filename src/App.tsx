@@ -308,6 +308,8 @@ function App() {
         relayToken={settings.relayToken}
         blockTrackers={settings.blockTrackers}
         blockedDomains={blockedDomains}
+        translateEnabled={settings.translateEnabled}
+        translateLanguage={settings.translateLanguage}
         loading={activeTab.loading}
         error={activeTab.error}
         hidden={showStartPage || statsOpen || historyOpen}
