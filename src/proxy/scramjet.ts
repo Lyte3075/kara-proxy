@@ -443,12 +443,39 @@ export async function getScramjetController(
   return controller;
 }
 
+class KaraUrlWatcherPlugin extends ManagedPlugin {
+  constructor(private readonly onUrlChange: (url: string) => void) {
+    super("kara-url-watcher", []);
+  }
+
+  override install(frame: Frame): void {
+    super.install(frame);
+
+    this.tap(frame.hooks.init.post, (context) => {
+      if (!context.isTopLevel) return;
+
+      const notify = () => this.onUrlChange(context.client.url.href);
+      notify();
+
+      this.tap(context.client.hooks.lifecycle.navigate, (_context, props) => {
+        this.onUrlChange(props.url);
+      });
+
+      context.window.addEventListener("hashchange", notify, { capture: true });
+    });
+  }
+}
+
 export function createKaraFrame(
   controller: Controller,
   iframe: HTMLIFrameElement,
-  getFilterConfig: () => KaraFilterConfig
+  getFilterConfig: () => KaraFilterConfig,
+  onUrlChange: (url: string) => void = () => {}
 ): Frame {
   return controller.createFrame(iframe, {
-    plugins: [createKaraFilterPlugin(getFilterConfig)],
+    plugins: [
+      createKaraFilterPlugin(getFilterConfig),
+      new KaraUrlWatcherPlugin(onUrlChange),
+    ],
   });
 }
