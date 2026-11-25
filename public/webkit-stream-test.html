@@ -55,7 +55,6 @@ h2{font-size:16px;margin:0}.state{font-size:12px;color:#a1a1aa;border:1px solid 
     const payload=JSON.stringify({marker,check:"request-body",message:"Kara Scramjet WebKit compatibility test"});
     const response=await withTimeout(fetch("https://httpbin.org/post?kara="+Date.now(),{
       method:"POST",
-      headers:{"Content-Type":"text/plain;charset=UTF-8","Cache-Control":"no-store"},
       body:payload,
       cache:"no-store"
     }),30000,"POST request");
