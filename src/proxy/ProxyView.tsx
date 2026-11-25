@@ -21,6 +21,7 @@ interface ProxyViewProps {
   onLoad: () => void;
   onError: (message: string) => void;
   onHome: () => void;
+  onNavigate: (url: string, title: string) => void;
   onRelayChange: (endpoint: string) => void;
   autofillPayload: { username: string; password: string; nonce: number } | null;
   inspectorOpen: boolean;
@@ -39,6 +40,7 @@ export default function ProxyView({
   onLoad,
   onError,
   onHome,
+  onNavigate,
   onRelayChange,
   autofillPayload,
   inspectorOpen,
@@ -240,6 +242,48 @@ export default function ProxyView({
       relayProbeAbort.abort();
     };
   }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
+
+  // Scramjet keeps the proxied document in the iframe. Poll its virtual
+  // URL so same-tab links, redirects, and history.pushState update Kara's
+  // chrome even when the iframe does not perform a full document reload.
+  useEffect(() => {
+    if (!iframeUrl || hidden) return;
+    let lastUrl = "";
+    let lastTitle = "";
+    const readCurrentPage = () => {
+      try {
+        const frameWindow = iframeRef.current?.contentWindow;
+        if (!frameWindow) return;
+        const frameLocation = new URL(frameWindow.location.href);
+        const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+        if (!base.pathname.endsWith("/")) base.pathname += "/";
+        const marker = base.pathname + "~/sj/";
+        let targetUrl = "";
+        const markerIndex = frameLocation.pathname.indexOf(marker);
+        if (markerIndex >= 0) {
+          const encodedTarget = frameLocation.pathname.slice(markerIndex + marker.length);
+          const decodedTarget = decodeURIComponent(encodedTarget);
+          targetUrl = new URL(decodedTarget).href;
+        } else if (frameLocation.origin !== window.location.origin) {
+          targetUrl = frameLocation.href;
+        }
+        if (!targetUrl) return;
+        let title = "";
+        try { title = frameWindow.document.title || ""; } catch {}
+        if (targetUrl !== lastUrl || title !== lastTitle) {
+          lastUrl = targetUrl;
+          lastTitle = title;
+          onNavigate(targetUrl, title || new URL(targetUrl).hostname);
+        }
+      } catch {
+        // A cross-origin frame is intentionally unreadable. Its initial URL
+        // remains available in Kara's address bar until a readable update.
+      }
+    };
+    const timer = window.setInterval(readCurrentPage, 600);
+    readCurrentPage();
+    return () => window.clearInterval(timer);
+  }, [iframeUrl, hidden, onNavigate]);
 
   useEffect(() => {
     setSlowLoad(false);
