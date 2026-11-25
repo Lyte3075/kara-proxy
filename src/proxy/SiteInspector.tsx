@@ -16,7 +16,7 @@ interface SiteInspectorProps {
   onClose: () => void;
 }
 
-const tabs: { id: InspectorTab; label: string; icon: typeof Code2 }[] = [
+const tabs: { id: InspectorTab; label: string; icon: typeof Braces }[] = [
   { id: "elements", label: "Elements", icon: Braces },
   { id: "console", label: "Console", icon: Terminal },
   { id: "network", label: "Network", icon: Network },
