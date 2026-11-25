@@ -109,6 +109,27 @@ function createSafeTransport(wispUrl: string): LibcurlClient {
   });
 }
 
+async function createInitializedTransport(wispUrl: string): Promise<LibcurlClient> {
+  const transport = createSafeTransport(wispUrl);
+  let timeout: number | undefined;
+
+  try {
+    await Promise.race([
+      transport.init(),
+      new Promise<never>((_, reject) => {
+        timeout = window.setTimeout(
+          () => reject(new Error("Kara's relay transport took too long to initialize. Check the relay and reload Kara.")),
+          20000
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+  }
+
+  return transport;
+}
+
 export function normalizeWispEndpoint(endpoint: string, token: string): string {
   const value = endpoint.trim();
   if (!value) throw new Error("Set your Wisp WebSocket endpoint in Settings first.");
@@ -214,9 +235,13 @@ async function initializeController(wispUrl: string): Promise<Controller> {
     throw new Error("Kara's browsing service worker did not activate. The browser may be blocking background workers for this site. Allow them for Kara and reload.");
   }
 
+  // LibcurlClient does not create its HTTPSession in the constructor.
+  // Initialize it before handing it to Scramjet, or the first proxied request
+  // reaches an undefined session and fails.
+  const transport = await createInitializedTransport(wispUrl);
   const controller = new Controller({
     serviceworker,
-    transport: createSafeTransport(wispUrl),
+    transport,
     config: {
       prefix: `${base.pathname}~/sj/`,
       scramjetPath: new URL("scramjet/scramjet.js", base).pathname,
@@ -263,7 +288,8 @@ export async function getScramjetController(
 
   const controller = await controllerPromise;
   if (activeWispUrl !== wispUrl) {
-    controller.setTransport(createSafeTransport(wispUrl));
+    const transport = await createInitializedTransport(wispUrl);
+    controller.setTransport(transport);
     activeWispUrl = wispUrl;
   }
   return controller;
