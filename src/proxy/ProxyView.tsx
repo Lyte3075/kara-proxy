@@ -4,6 +4,7 @@ import type { Frame } from "@mercuryworkshop/scramjet-controller";
 import {
   createKaraFrame,
   getScramjetController,
+  normalizeWispEndpoint,
   type KaraFilterConfig,
 } from "@/proxy/scramjet";
 
@@ -79,54 +80,39 @@ export default function ProxyView({
         } catch { return []; }
       };
 
-      // A health endpoint is diagnostic only. Some browsers, privacy extensions,
-      // and relay hosts prevent cross-origin health fetches even when WSS works.
-      // Never reject a usable relay solely because its optional HTTP check is blocked.
+      // Probe the actual Wisp WebSocket endpoint. An HTTP /health request is
+      // not a reliable readiness check: some valid Wisp hosts expose no HTTP
+      // health route, and Safari may block cross-origin health responses.
       const wakeRelay = async (endpoint: string): Promise<void> => {
         if (cancelled) throw new Error("Relay check cancelled.");
-        const health = new URL(endpoint);
-        health.protocol = "https:";
-        health.pathname = "/health";
-        health.search = "";
-        health.hash = "";
+        const socketUrl = normalizeWispEndpoint(endpoint, relayToken);
+        setRelayStatus("Connecting to relay…");
 
-        // Free relays may sleep. A no-cors GET can still wake and detect a
-        // reachable host when the browser refuses to expose cross-origin
-        // response headers to Kara. Retry transient network failures instead
-        // of giving up after a single short request.
-        const deadline = Date.now() + 75000;
-        let attempt = 0;
-        let lastFailure = "The relay did not respond.";
-        while (!cancelled && Date.now() < deadline) {
-          attempt += 1;
-          setRelayStatus(attempt === 1
-            ? "Waking relay…"
-            : `Waiting for relay to wake… attempt ${attempt}`);
-          const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), 12000);
-          try {
-            const response = await fetch(health.toString(), {
-              method: "GET",
-              cache: "no-store",
-              mode: "no-cors",
-              credentials: "omit",
-              signal: abort.signal,
-            });
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const socket = new WebSocket(socketUrl);
+          const timeout = window.setTimeout(() => {
+            finish(new Error("The relay WebSocket connection timed out."));
+          }, 12000);
+
+          const finish = (error?: Error) => {
+            if (settled) return;
+            settled = true;
             window.clearTimeout(timeout);
-            if (response.type === "opaque" || response.ok) return;
-            lastFailure = `Health endpoint returned HTTP ${response.status}.`;
-          } catch (cause) {
-            window.clearTimeout(timeout);
-            if (cancelled) throw new Error("Relay check cancelled.");
-            lastFailure = cause instanceof Error && cause.name === "AbortError"
-              ? "Relay wake-up request timed out."
-              : "Could not reach the relay health endpoint.";
-          }
-          if (Date.now() + 2500 >= deadline) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 2500));
-        }
+            socket.onopen = null;
+            socket.onerror = null;
+            socket.onclose = null;
+            try { socket.close(); } catch {}
+            if (error) reject(error);
+            else resolve();
+          };
+
+          socket.onopen = () => finish();
+          socket.onerror = () => finish(new Error("Could not connect to the relay WebSocket. Check the WSS address and relay availability."));
+          socket.onclose = () => finish(new Error("The relay closed the WebSocket before connecting."));
+        });
+
         if (cancelled) throw new Error("Relay check cancelled.");
-        throw new Error(lastFailure + " The relay may be asleep or unreachable. Try again in a moment or select another relay.");
       };
 
       const saved = readSavedRelays();
