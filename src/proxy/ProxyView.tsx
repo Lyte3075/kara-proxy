@@ -79,29 +79,38 @@ export default function ProxyView({
         } catch { return []; }
       };
 
+      // A health endpoint is diagnostic only. Some browsers, privacy extensions,
+      // and relay hosts prevent cross-origin health fetches even when WSS works.
+      // Never reject a usable relay solely because its optional HTTP check is blocked.
       const wakeRelay = async (endpoint: string): Promise<void> => {
+        if (cancelled) throw new Error("Relay check cancelled.");
+        setRelayStatus("Checking relay…");
         const health = new URL(endpoint);
         health.protocol = "https:";
         health.pathname = "/health";
         health.search = "";
         health.hash = "";
-        let lastError: unknown;
-        for (let attempt = 1; attempt <= 10; attempt += 1) {
-          if (cancelled) throw new Error("Relay check cancelled.");
-          setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/10)");
-          const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), 15000);
-          try {
-            const response = await fetch(health.toString(), { method: "GET", cache: "no-store", mode: "cors", credentials: "omit", signal: abort.signal });
-            if (!response.ok) throw new Error("Relay health check returned HTTP " + response.status + ".");
+        const abort = new AbortController();
+        const timeout = window.setTimeout(() => abort.abort(), 5000);
+        try {
+          const response = await fetch(health.toString(), {
+            method: "GET",
+            cache: "no-store",
+            mode: "cors",
+            credentials: "omit",
+            signal: abort.signal,
+          });
+          if (response.ok) {
             const data = await response.json();
-            if (data?.ok !== true || data?.protocol !== "wisp") throw new Error("This host did not return a valid Kara Wisp health response.");
-            return;
-          } catch (cause) { lastError = cause; }
-          finally { window.clearTimeout(timeout); }
-          if (attempt < 10) await new Promise((resolve) => window.setTimeout(resolve, 2500));
+            if (data?.ok === true && data?.protocol === "wisp") return;
+          }
+          setRelayStatus("Health check inconclusive. Testing secure WebSocket…");
+        } catch {
+          if (cancelled) throw new Error("Relay check cancelled.");
+          setRelayStatus("HTTP health check unavailable. Testing secure WebSocket…");
+        } finally {
+          window.clearTimeout(timeout);
         }
-        throw lastError instanceof Error ? lastError : new Error("Relay did not wake up in time.");
       };
 
       const saved = readSavedRelays();
