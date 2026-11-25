@@ -132,7 +132,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
       try {
         const currentWindow = iframeRef.current?.contentWindow;
         if (!currentWindow) return;
-        pageWindow = currentWindow;
+        pageWindow = currentWindow as Window & typeof globalThis;
         void pageWindow.document.documentElement;
       } catch { return; }
       const pageConsole = pageWindow.console;
