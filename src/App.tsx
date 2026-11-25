@@ -181,9 +181,9 @@ function App() {
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
   const handleProxiedNavigation = useCallback((url: string, title: string) => {
+    const pageUrl = restoreOriginalPageUrl(url);
     setTabs((current) => current.map((tab) => {
       if (tab.id !== activeTabId) return tab;
-      const pageUrl = restoreOriginalPageUrl(url);
       const history = tab.history.slice();
       if (history[tab.navIdx] !== pageUrl) {
         const nextHistory = history.slice(0, tab.navIdx + 1);
