@@ -515,7 +515,7 @@ export default function SettingsPage({
                 />
                 <label htmlFor="kara-translate-enabled" className="cursor-pointer">
                   <span className="block text-sm font-medium text-[var(--text-primary)]">Enable page translation</span>
-                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Adds Google's translation control to proxied pages. Turn it off to stop adding the control. Reload the current page to restore its original text after translating.</span>
+                  <span className="block text-xs text-[var(--text-muted)] mt-1 leading-relaxed">Routes pages through Google's translated-site service. Turn it off to return to direct proxy loading. Google fetches the translated copy, so this is less private than using Kara's relay alone.</span>
                 </label>
               </div>
               <div>
@@ -536,7 +536,7 @@ export default function SettingsPage({
                     ["th", "Thai"], ["id", "Indonesian"], ["sv", "Swedish"], ["he", "Hebrew"],
                   ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                 </select>
-                <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">Kara uses Google's page-translation widget. Translation availability and compatibility depend on Google's service and the website being viewed. It does not translate video audio.</p>
+                <p className="text-xs text-[var(--text-muted)] mt-2 leading-relaxed">Kara uses Google's translated-site proxy. It works best on public, text-heavy pages. Some interactive sites, sign-ins, and media players may not work correctly, and video audio is not translated.</p>
               </div>
             </div>
           )}
