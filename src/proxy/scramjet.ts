@@ -183,7 +183,7 @@ let transportRecoveryPromise: Promise<void> | null = null;
 let lastTransportRecoveryAt = 0;
 let recoveryListenersInstalled = false;
 
-function recoverActiveTransport(reason: string): Promise<void> {
+function recoverActiveTransport(reason: string, force = false): Promise<void> {
   if (!activeController || !activeWispUrl || !navigator.onLine) {
     return Promise.resolve();
   }
@@ -192,7 +192,7 @@ function recoverActiveTransport(reason: string): Promise<void> {
   // Avoid rebuilding libcurl sessions repeatedly when many requests fail
   // together, or when iOS emits several resume/network events in a row.
   const now = Date.now();
-  if (now - lastTransportRecoveryAt < 10000) return Promise.resolve();
+  if (!force && now - lastTransportRecoveryAt < 10000) return Promise.resolve();
   lastTransportRecoveryAt = now;
 
   const controller = activeController;
@@ -202,7 +202,7 @@ function recoverActiveTransport(reason: string): Promise<void> {
   const recovery = (async () => {
     const transport = await createInitializedTransport(
       endpoint,
-      (error) => { void recoverActiveTransport(error instanceof Error ? error.message : "request failed"); }
+      (error) => { void recoverActiveTransport(error instanceof Error ? error.message : "request failed", true); }
     );
     // The user may have switched relays while this replacement was starting.
     if (activeController === controller && activeWispUrl === endpoint) {
