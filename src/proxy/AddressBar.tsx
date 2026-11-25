@@ -42,6 +42,7 @@ export default function AddressBar({ value, loading, canGoBack, canGoForward, on
         {proxied ? <ShieldCheck size={15} className="text-emerald-400 shrink-0" /> : <Lock size={15} className="text-[var(--text-faint)] shrink-0" />}
         <input
           ref={inputRef}
+          id="kara-address-input"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
