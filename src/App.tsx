@@ -179,6 +179,25 @@ function App() {
   const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
+  const handleProxiedNavigation = useCallback((url: string, title: string) => {
+    setTabs((current) => current.map((tab) => {
+      if (tab.id !== activeTabId) return tab;
+      const history = tab.history.slice();
+      if (history[tab.navIdx] !== url) {
+        const nextHistory = history.slice(0, tab.navIdx + 1);
+        nextHistory.push(url);
+        return { ...tab, url, title, history: nextHistory, navIdx: nextHistory.length - 1, loading: false };
+      }
+      return { ...tab, url, title, loading: false };
+    }));
+    if (document.activeElement?.id !== "kara-address-input") setInput(url);
+    setHistory((current) => [{
+      url,
+      displayUrl: url.replace(/^https?:\\/\\//, ""),
+      title: title || url,
+      ts: Date.now(),
+    }, ...current.filter((entry) => entry.url !== url)].slice(0, 100));
+  }, [activeTabId]);
   const handleRelayChange = useCallback((endpoint: string) => setSettings((current) => ({ ...current, relay: endpoint })), []);
   const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
@@ -295,6 +314,7 @@ function App() {
         onLoad={handleLoad}
         onError={handleProxyError}
         onHome={handleHome}
+        onNavigate={handleProxiedNavigation}
         onRelayChange={handleRelayChange}
         autofillPayload={autofillPayload}
         inspectorOpen={inspectorOpen}
