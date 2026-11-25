@@ -143,23 +143,48 @@ let controllerPromise: Promise<Controller> | null = null;
 let activeWispUrl = "";
 
 async function initializeController(wispUrl: string): Promise<Controller> {
+  // Fail early with actionable messages instead of a generic blank loading screen.
+  if (!window.isSecureContext) {
+    throw new Error("Kara needs a secure HTTPS context for its browsing engine. Open the HTTPS version of Kara.");
+  }
   if (!("serviceWorker" in navigator)) {
-    throw new Error("This browser does not support service workers. Use a modern browser over HTTPS.");
+    throw new Error("This browser or its current privacy settings disable service workers. Allow service workers for Kara, then reload.");
+  }
+  if (typeof WebSocket === "undefined" || typeof WebAssembly === "undefined" || typeof fetch === "undefined") {
+    throw new Error("This browser is missing a required WebSocket, WebAssembly, or Fetch feature. Update the browser or use a supported browser.");
   }
 
   const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
   if (!base.pathname.endsWith("/")) base.pathname += "/";
 
   const swUrl = new URL("sw.js", base);
-  const registration = await navigator.serviceWorker.register(swUrl, {
-    scope: base.pathname,
-    updateViaCache: "none",
-  });
-  await navigator.serviceWorker.ready;
+  let registration: ServiceWorkerRegistration;
+  try {
+    registration = await navigator.serviceWorker.register(swUrl, {
+      scope: base.pathname,
+      updateViaCache: "none",
+    });
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : "Unknown registration error";
+    throw new Error("Kara could not register its browsing service worker. Check whether this site's browser permissions or content settings block service workers. " + detail);
+  }
 
-  const serviceworker = navigator.serviceWorker.controller ?? registration.active;
-  if (!serviceworker) {
-    throw new Error("Scramjet's service worker is not active yet. Reload Kara and try again.");
+  // On a first visit, ready can resolve before the new worker controls this document.
+  // Wait for an activated worker instead of failing immediately.
+  const waitForReady = navigator.serviceWorker.ready;
+  const readyRegistration = await Promise.race([
+    waitForReady,
+    new Promise<never>((_, reject) => window.setTimeout(
+      () => reject(new Error("Kara's service worker is taking too long to start. Check browser site settings, then reload Kara.")),
+      15000
+    )),
+  ]);
+  const serviceworker = navigator.serviceWorker.controller ??
+    readyRegistration.active ??
+    registration.active;
+
+  if (!serviceworker || serviceworker.state !== "activated") {
+    throw new Error("Kara's browsing service worker did not activate. The browser may be blocking background workers for this site. Allow them for Kara and reload.");
   }
 
   const controller = new Controller({
