@@ -36,7 +36,7 @@ export const SEARCH_ENGINES: SearchEngine[] = [
   { id: "ecosia", name: "Ecosia", searchUrl: "https://www.ecosia.org/search?q=%s", host: "ecosia.org" },
 ];
 
-export type ThemeColor = "red" | "blue" | "green" | "amber" | "violet";
+export type ThemeColor = "red" | "blue" | "green" | "amber" | "violet" | "black";
 export type ThemeMode = "dark" | "light";
 
 export interface CustomPalette {
@@ -77,11 +77,12 @@ export const DEFAULT_THEME_MODE: ThemeMode = "dark";
 export const DEFAULT_BLOCK_TRACKERS = false;
 
 export const THEME_COLORS: { id: ThemeColor; name: string }[] = [
-  { id: "red", name: "Crimson" },
-  { id: "blue", name: "Azure" },
-  { id: "green", name: "Emerald" },
-  { id: "amber", name: "Amber" },
-  { id: "violet", name: "Violet" },
+  { id: "red", name: "Crimson · Kara" },
+  { id: "blue", name: "Azure · Bert" },
+  { id: "green", name: "Emerald · Emily" },
+  { id: "amber", name: "Amber · Amber" },
+  { id: "violet", name: "Violet · James" },
+  { id: "black", name: "Lyte" },
 ];
 
 export const TRACKER_DOMAINS = [
