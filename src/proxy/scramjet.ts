@@ -141,6 +141,7 @@ export function normalizeWispEndpoint(endpoint: string, token: string): string {
 
 let controllerPromise: Promise<Controller> | null = null;
 let activeWispUrl = "";
+let serviceWorkerKeepalive: number | null = null;
 
 async function initializeController(wispUrl: string): Promise<Controller> {
   // Fail early with actionable messages instead of a generic blank loading screen.
@@ -169,21 +170,47 @@ async function initializeController(wispUrl: string): Promise<Controller> {
     throw new Error("Kara could not register its browsing service worker. Check whether this site's browser permissions or content settings block service workers. " + detail);
   }
 
-  // On a first visit, ready can resolve before the new worker controls this document.
-  // Wait for an activated worker instead of failing immediately.
-  const waitForReady = navigator.serviceWorker.ready;
+  // The active worker is not necessarily controlling this document yet.
+  // Scramjet routes proxied iframe requests only after this page is controlled.
   const readyRegistration = await Promise.race([
-    waitForReady,
+    navigator.serviceWorker.ready,
     new Promise<never>((_, reject) => window.setTimeout(
       () => reject(new Error("Kara's service worker is taking too long to start. Check browser site settings, then reload Kara.")),
       15000
     )),
   ]);
-  const serviceworker = navigator.serviceWorker.controller ??
-    readyRegistration.active ??
-    registration.active;
 
-  if (!serviceworker || serviceworker.state !== "activated") {
+  const serviceworker = await new Promise<ServiceWorker>((resolve, reject) => {
+    const current = navigator.serviceWorker.controller;
+    if (current) {
+      resolve(current);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Kara's service worker activated but did not take control of this page. Reload Kara and try again."));
+    }, 15000);
+
+    const checkController = () => {
+      const worker = navigator.serviceWorker.controller;
+      if (!worker) return;
+      cleanup();
+      resolve(worker);
+    };
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      navigator.serviceWorker.removeEventListener("controllerchange", checkController);
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", checkController);
+    // Check again after subscribing so a controllerchange between the first
+    // read and listener registration cannot leave initialization waiting.
+    checkController();
+  });
+
+  if (serviceworker.state !== "activated") {
     throw new Error("Kara's browsing service worker did not activate. The browser may be blocking background workers for this site. Allow them for Kara and reload.");
   }
 
@@ -200,6 +227,21 @@ async function initializeController(wispUrl: string): Promise<Controller> {
   });
 
   await controller.wait();
+
+  // Scramjet currently keeps its frame-routing table in service-worker memory.
+  // Some browsers terminate an idle worker and lose that table, so keep the
+  // worker that owns this controller awake while Kara remains open.
+  if (serviceWorkerKeepalive !== null) {
+    window.clearInterval(serviceWorkerKeepalive);
+  }
+  serviceWorkerKeepalive = window.setInterval(() => {
+    try {
+      (navigator.serviceWorker.controller ?? serviceworker).postMessage("keepalive");
+    } catch (error) {
+      console.warn("[Kara] Could not send the Scramjet service-worker keepalive.", error);
+    }
+  }, 15000);
+
   return controller;
 }
 
