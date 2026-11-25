@@ -932,7 +932,7 @@ function themeSwatch(color: ThemeColor): string {
     green: "linear-gradient(135deg, #16a34a, #14532d)",
     amber: "linear-gradient(135deg, #d97706, #92400e)",
     violet: "linear-gradient(135deg, #9333ea, #5b21b6)",
-    black: "linear-gradient(135deg, #ffffff, #000000)",
+    black: "linear-gradient(135deg, #ffffff, #000000)", // Lyte monochrome theme
   };
   return map[color];
 }
