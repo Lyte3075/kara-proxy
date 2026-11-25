@@ -864,13 +864,15 @@ export default function SettingsPage({
               </div>
               <div className="pt-3 border-t" style={{ borderColor: "var(--border-subtle)" }}>
                 <button
-                  onClick={() => { if (confirm("Reset all Kara data?")) onResetAll(); }}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition"
-                  style={{ borderColor: "var(--border-primary)", color: "var(--accent-bright)" }}
+                  onClick={() => {
+                    if (confirm("NUCLEAR RESET: This permanently deletes Kara's local data, saved tabs, browsing history, bookmarks, vault, cached files, IndexedDB databases, and service workers for this website. This cannot be undone. Continue?")) onResetAll();
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition hover:bg-red-500/10"
+                  style={{ borderColor: "rgba(239,68,68,.55)", color: "#f87171" }}
                 >
-                  <RefreshCw size={15} /> Reset everything
+                  <Trash2 size={15} /> Nuclear Reset
                 </button>
-                <p className="text-xs text-[var(--text-faint)] mt-2 leading-relaxed">Clears all stored data. Cannot be undone.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2 leading-relaxed">Erases Kara's local storage, session tabs, IndexedDB, Cache Storage, service workers, settings, history, bookmarks, vault, and saved proxy data, then reloads. Safari-managed cookies and browser website data must still be cleared in iOS Settings.</p>
               </div>
             </div>
           )}
