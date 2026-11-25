@@ -191,8 +191,10 @@ function scramjetCompatibilityPatches() {
         entry.isFile() && /\.(?:m?js)$/.test(entry.name)
       );
 
-      if (!runtimeFiles.some(entry => entry.name === 'controller.sw.js')) {
-        throw new Error('Kara could not verify the Scramjet service-worker bundle.');
+      for (const requiredFile of ['controller.sw.js', 'controller.inject.js']) {
+        if (!runtimeFiles.some(entry => entry.name === requiredFile)) {
+          throw new Error('Kara could not find the required Scramjet runtime bundle: ' + requiredFile);
+        }
       }
 
       for (const entry of runtimeFiles) {
