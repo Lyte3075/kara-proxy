@@ -137,7 +137,7 @@ function createSafeTransport(
             // that case target.request() has already resolved, so the outer
             // catch cannot see the failure. Observe the body stream itself and
             // refresh the transport for future requests if reading it fails.
-            if (response.body && typeof ReadableStream !== "undefined") {
+            if (typeof ReadableStream !== "undefined" && response.body instanceof ReadableStream) {
               const reader = response.body.getReader();
               let finished = false;
               const monitoredBody = new ReadableStream<Uint8Array>({
