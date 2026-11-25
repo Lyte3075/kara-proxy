@@ -129,7 +129,7 @@ function scramjetCompatibilityPatches() {
         throw new Error('Kara could not find dist/controller/controller.sw.js to apply the Scramjet response fix.');
       }
 
-      const unsafeResponse = /new Response\\(([$\\w]+)\\.body,\\s*\\{\\s*status:\\s*\\1\\.status,\\s*statusText:\\s*\\1\\.statusText,\\s*headers:\\s*\\1\\.headers\\s*\\}\\)/g;
+      const unsafeResponse = /new Response\(([$\w]+)\.body,\s*\{\s*status:\s*\1\.status,\s*statusText:\s*\1\.statusText,\s*headers:\s*\1\.headers\s*\}\)/g;
       const patchedWorker = worker.replace(
         unsafeResponse,
         'new Response([204, 205, 304].includes($1.status) ? null : $1.body, { status: $1.status, statusText: $1.statusText, headers: $1.headers })'
@@ -143,7 +143,7 @@ function scramjetCompatibilityPatches() {
 
       const entries = await readdir(outputDir, { withFileTypes: true });
       const runtimeFiles = entries.filter(entry =>
-        entry.isFile() && /\\.(?:m?js)$/.test(entry.name)
+        entry.isFile() && /\.(?:m?js)$/.test(entry.name)
       );
 
       if (!runtimeFiles.some(entry => entry.name === 'controller.sw.js')) {
