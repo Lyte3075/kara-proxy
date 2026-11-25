@@ -84,33 +84,49 @@ export default function ProxyView({
       // Never reject a usable relay solely because its optional HTTP check is blocked.
       const wakeRelay = async (endpoint: string): Promise<void> => {
         if (cancelled) throw new Error("Relay check cancelled.");
-        setRelayStatus("Checking relay…");
         const health = new URL(endpoint);
         health.protocol = "https:";
         health.pathname = "/health";
         health.search = "";
         health.hash = "";
-        const abort = new AbortController();
-        const timeout = window.setTimeout(() => abort.abort(), 5000);
-        try {
-          const response = await fetch(health.toString(), {
-            method: "GET",
-            cache: "no-store",
-            mode: "cors",
-            credentials: "omit",
-            signal: abort.signal,
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (data?.ok === true && data?.protocol === "wisp") return;
+
+        // Free relays may sleep. A no-cors GET can still wake and detect a
+        // reachable host when the browser refuses to expose cross-origin
+        // response headers to Kara. Retry transient network failures instead
+        // of giving up after a single short request.
+        const deadline = Date.now() + 75000;
+        let attempt = 0;
+        let lastFailure = "The relay did not respond.";
+        while (!cancelled && Date.now() < deadline) {
+          attempt += 1;
+          setRelayStatus(attempt === 1
+            ? "Waking relay…"
+            : `Waiting for relay to wake… attempt ${attempt}`);
+          const abort = new AbortController();
+          const timeout = window.setTimeout(() => abort.abort(), 12000);
+          try {
+            const response = await fetch(health.toString(), {
+              method: "GET",
+              cache: "no-store",
+              mode: "no-cors",
+              credentials: "omit",
+              signal: abort.signal,
+            });
+            window.clearTimeout(timeout);
+            if (response.type === "opaque" || response.ok) return;
+            lastFailure = `Health endpoint returned HTTP ${response.status}.`;
+          } catch (cause) {
+            window.clearTimeout(timeout);
+            if (cancelled) throw new Error("Relay check cancelled.");
+            lastFailure = cause instanceof Error && cause.name === "AbortError"
+              ? "Relay wake-up request timed out."
+              : "Could not reach the relay health endpoint.";
           }
-          setRelayStatus("Health check inconclusive. Testing secure WebSocket…");
-        } catch {
-          if (cancelled) throw new Error("Relay check cancelled.");
-          setRelayStatus("HTTP health check unavailable. Testing secure WebSocket…");
-        } finally {
-          window.clearTimeout(timeout);
+          if (Date.now() + 2500 >= deadline) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 2500));
         }
+        if (cancelled) throw new Error("Relay check cancelled.");
+        throw new Error(lastFailure + " The relay may be asleep or unreachable. Try again in a moment or select another relay.");
       };
 
       const saved = readSavedRelays();
