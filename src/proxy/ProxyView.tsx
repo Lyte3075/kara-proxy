@@ -243,44 +243,61 @@ export default function ProxyView({
     };
   }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
 
-  // Scramjet keeps the proxied document in the iframe. Poll its virtual
-  // URL so same-tab links, redirects, and history.pushState update Kara's
-  // chrome even when the iframe does not perform a full document reload.
+  // Keep Kara's browser chrome synchronized with Scramjet's virtual page.
+  // Safari can briefly expose about:blank while the controller is attaching
+  // the frame, so never publish that placeholder as the visited URL.
   useEffect(() => {
     if (!iframeUrl || hidden) return;
     let lastUrl = "";
     let lastTitle = "";
     const readCurrentPage = () => {
+      const frameWindow = iframeRef.current?.contentWindow;
+      if (!frameWindow) return;
+      let frameHref = "";
+      let title = "";
       try {
-        const frameWindow = iframeRef.current?.contentWindow;
-        if (!frameWindow) return;
-        const frameLocation = new URL(frameWindow.location.href);
-        const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
-        if (!base.pathname.endsWith("/")) base.pathname += "/";
-        const marker = base.pathname + "~/sj/";
-        let targetUrl = "";
-        const markerIndex = frameLocation.pathname.indexOf(marker);
-        if (markerIndex >= 0) {
-          const encodedTarget = frameLocation.pathname.slice(markerIndex + marker.length);
-          const decodedTarget = decodeURIComponent(encodedTarget);
-          targetUrl = new URL(decodedTarget + frameLocation.search + frameLocation.hash).href;
-        } else if (frameLocation.origin !== window.location.origin) {
-          targetUrl = frameLocation.href;
-        }
-        if (!targetUrl) return;
-        let title = "";
-        try { title = frameWindow.document.title || ""; } catch {}
-        if (targetUrl !== lastUrl || title !== lastTitle) {
-          lastUrl = targetUrl;
-          lastTitle = title;
-          onNavigate(targetUrl, title || new URL(targetUrl).hostname);
+        frameHref = frameWindow.location.href;
+        if (frameHref && frameHref !== "about:blank") {
+          title = frameWindow.document.title || "";
         }
       } catch {
-        // A cross-origin frame is intentionally unreadable. Its initial URL
-        // remains available in Kara's address bar until a readable update.
+        // The virtual frame can be temporarily unreadable during navigation.
+      }
+
+      let targetUrl = "";
+      if (frameHref && frameHref !== "about:blank") {
+        try {
+          const frameLocation = new URL(frameHref);
+          const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+          if (!base.pathname.endsWith("/")) base.pathname += "/";
+          const marker = base.pathname + "~/sj/";
+          const markerIndex = frameLocation.pathname.indexOf(marker);
+          if (markerIndex >= 0) {
+            const encodedTarget = frameLocation.pathname.slice(markerIndex + marker.length);
+            const decodedTarget = decodeURIComponent(encodedTarget);
+            targetUrl = new URL(decodedTarget + frameLocation.search + frameLocation.hash).href;
+          } else if (frameLocation.origin !== window.location.origin) {
+            targetUrl = frameLocation.href;
+          }
+        } catch {
+          // Keep the last known destination if Safari reports a transient URL.
+        }
+      }
+
+      // The iframe starts at about:blank before Scramjet's Frame.go() takes
+      // effect. Use the requested destination until the virtual URL is ready.
+      if (!targetUrl) targetUrl = lastUrl || iframeUrl;
+      if (targetUrl === "about:blank") return;
+      if (!title) {
+        try { title = new URL(targetUrl).hostname; } catch { title = "Loading page"; }
+      }
+      if (targetUrl !== lastUrl || title !== lastTitle) {
+        lastUrl = targetUrl;
+        lastTitle = title;
+        onNavigate(targetUrl, title);
       }
     };
-    const timer = window.setInterval(readCurrentPage, 600);
+    const timer = window.setInterval(readCurrentPage, 400);
     readCurrentPage();
     return () => window.clearInterval(timer);
   }, [iframeUrl, hidden, onNavigate]);
