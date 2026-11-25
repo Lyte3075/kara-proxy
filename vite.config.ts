@@ -47,39 +47,7 @@ const karaCanTransferReadableStream = (() => {
 
       await writeFile(workerPath, patched, 'utf8');
 
-      // Patch the page-side controller: on engines without transferable streams,
-      // buffer only the affected response body and transfer its ArrayBuffer.
-      const apiPath = fileURLToPath(new URL('./dist/controller/controller.api.js', import.meta.url));
-      let api: string;
-      try {
-        api = await readFile(apiPath, 'utf8');
-      } catch {
-        throw new Error('Kara could not find dist/controller/controller.api.js for the WebKit stream-transfer patch.');
-      }
-      if (!api.includes('fetchresponse.body')) {
-        throw new Error('Kara could not locate the Scramjet response-transfer code. Build stopped rather than shipping a partial WebKit fix.');
-      }
-      const returnPattern = /return\s*\[\s*\{\s*body:\s*fetchresponse\.body/;
-      const transferPattern = /fetchresponse\.body\s+instanceof\s+ReadableStream\s*\|\|\s*fetchresponse\.body\s+instanceof\s+ArrayBuffer\s*\?\s*\[fetchresponse\.body\]\s*:\s*\[\]/;
-      if (!returnPattern.test(api) || !transferPattern.test(api)) {
-        throw new Error('Kara found the Scramjet controller but its response-transfer code differs from the expected version. Build stopped for safety.');
-      }
-      api = api.replace(
-        returnPattern,
-        'const responseBody = fetchresponse.body instanceof ReadableStream && !karaCanTransferReadableStream ? await fetchresponse.arrayBuffer() : fetchresponse.body; return [{ body: responseBody'
-      );
-      api = api.replace(
-        transferPattern,
-        'responseBody instanceof ReadableStream || responseBody instanceof ArrayBuffer ? [responseBody] : []'
-      );
-      if (!api.includes('karaCanTransferReadableStream')) {
-        const marker = 'class Controller';
-        const at = api.indexOf(marker);
-        if (at < 0) throw new Error('Kara could not locate the controller initialization point for its WebKit feature probe.');
-        api = api.slice(0, at) + transferableStreamProbe + api.slice(at);
-      }
-      await writeFile(apiPath, api, 'utf8');
-      console.info('Kara patched Scramjet response handling for WebKit stream-transfer compatibility.');
+      console.info('Kara applied the existing Scramjet no-body response patch.');
     },
   };
 }
