@@ -109,6 +109,27 @@ function createSafeTransport(wispUrl: string): LibcurlClient {
   });
 }
 
+async function createInitializedTransport(wispUrl: string): Promise<LibcurlClient> {
+  const transport = createSafeTransport(wispUrl);
+  let timeout: number | undefined;
+
+  try {
+    await Promise.race([
+      transport.init(),
+      new Promise<never>((_, reject) => {
+        timeout = window.setTimeout(
+          () => reject(new Error("Kara's relay transport took too long to initialize. Check the relay and reload Kara.")),
+          20000
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+  }
+
+  return transport;
+}
+
 export function normalizeWispEndpoint(endpoint: string, token: string): string {
   const value = endpoint.trim();
   if (!value) throw new Error("Set your Wisp WebSocket endpoint in Settings first.");
@@ -141,30 +162,86 @@ export function normalizeWispEndpoint(endpoint: string, token: string): string {
 
 let controllerPromise: Promise<Controller> | null = null;
 let activeWispUrl = "";
+let serviceWorkerKeepalive: number | null = null;
 
 async function initializeController(wispUrl: string): Promise<Controller> {
+  // Fail early with actionable messages instead of a generic blank loading screen.
+  if (!window.isSecureContext) {
+    throw new Error("Kara needs a secure HTTPS context for its browsing engine. Open the HTTPS version of Kara.");
+  }
   if (!("serviceWorker" in navigator)) {
-    throw new Error("This browser does not support service workers. Use a modern browser over HTTPS.");
+    throw new Error("This browser or its current privacy settings disable service workers. Allow service workers for Kara, then reload.");
+  }
+  if (typeof WebSocket === "undefined" || typeof WebAssembly === "undefined" || typeof fetch === "undefined") {
+    throw new Error("This browser is missing a required WebSocket, WebAssembly, or Fetch feature. Update the browser or use a supported browser.");
   }
 
   const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
   if (!base.pathname.endsWith("/")) base.pathname += "/";
 
   const swUrl = new URL("sw.js", base);
-  const registration = await navigator.serviceWorker.register(swUrl, {
-    scope: base.pathname,
-    updateViaCache: "none",
-  });
-  await navigator.serviceWorker.ready;
-
-  const serviceworker = navigator.serviceWorker.controller ?? registration.active;
-  if (!serviceworker) {
-    throw new Error("Scramjet's service worker is not active yet. Reload Kara and try again.");
+  let registration: ServiceWorkerRegistration;
+  try {
+    registration = await navigator.serviceWorker.register(swUrl, {
+      scope: base.pathname,
+      updateViaCache: "none",
+    });
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : "Unknown registration error";
+    throw new Error("Kara could not register its browsing service worker. Check whether this site's browser permissions or content settings block service workers. " + detail);
   }
 
+  // The active worker is not necessarily controlling this document yet.
+  // Scramjet routes proxied iframe requests only after this page is controlled.
+  const readyRegistration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) => window.setTimeout(
+      () => reject(new Error("Kara's service worker is taking too long to start. Check browser site settings, then reload Kara.")),
+      15000
+    )),
+  ]);
+
+  const serviceworker = await new Promise<ServiceWorker>((resolve, reject) => {
+    const current = navigator.serviceWorker.controller;
+    if (current) {
+      resolve(current);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Kara's service worker activated but did not take control of this page. Reload Kara and try again."));
+    }, 15000);
+
+    const checkController = () => {
+      const worker = navigator.serviceWorker.controller;
+      if (!worker) return;
+      cleanup();
+      resolve(worker);
+    };
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      navigator.serviceWorker.removeEventListener("controllerchange", checkController);
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", checkController);
+    // Check again after subscribing so a controllerchange between the first
+    // read and listener registration cannot leave initialization waiting.
+    checkController();
+  });
+
+  if (serviceworker.state !== "activated") {
+    throw new Error("Kara's browsing service worker did not activate. The browser may be blocking background workers for this site. Allow them for Kara and reload.");
+  }
+
+  // LibcurlClient does not create its HTTPSession in the constructor.
+  // Initialize it before handing it to Scramjet, or the first proxied request
+  // reaches an undefined session and fails.
+  const transport = await createInitializedTransport(wispUrl);
   const controller = new Controller({
     serviceworker,
-    transport: createSafeTransport(wispUrl),
+    transport,
     config: {
       prefix: `${base.pathname}~/sj/`,
       scramjetPath: new URL("scramjet/scramjet.js", base).pathname,
@@ -175,6 +252,21 @@ async function initializeController(wispUrl: string): Promise<Controller> {
   });
 
   await controller.wait();
+
+  // Scramjet currently keeps its frame-routing table in service-worker memory.
+  // Some browsers terminate an idle worker and lose that table, so keep the
+  // worker that owns this controller awake while Kara remains open.
+  if (serviceWorkerKeepalive !== null) {
+    window.clearInterval(serviceWorkerKeepalive);
+  }
+  serviceWorkerKeepalive = window.setInterval(() => {
+    try {
+      (navigator.serviceWorker.controller ?? serviceworker).postMessage("keepalive");
+    } catch (error) {
+      console.warn("[Kara] Could not send the Scramjet service-worker keepalive.", error);
+    }
+  }, 15000);
+
   return controller;
 }
 
@@ -196,7 +288,8 @@ export async function getScramjetController(
 
   const controller = await controllerPromise;
   if (activeWispUrl !== wispUrl) {
-    controller.setTransport(createSafeTransport(wispUrl));
+    const transport = await createInitializedTransport(wispUrl);
+    controller.setTransport(transport);
     activeWispUrl = wispUrl;
   }
   return controller;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, Settings as SettingsIcon, HelpCircle, KeyRound, BarChart3 } from "lucide-react";
+import { Clock, Settings as SettingsIcon, HelpCircle, KeyRound, BarChart3, Bug } from "lucide-react";
+import SiteInspector from "@/proxy/SiteInspector";
 import AddressBar from "@/proxy/AddressBar";
 import ProxyView from "@/proxy/ProxyView";
 import HistoryPanel from "@/proxy/HistoryPanel";
@@ -94,6 +95,7 @@ function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [autofillPayload, setAutofillPayload] = useState<{ username: string; password: string; nonce: number } | null>(null);
 
   const searchEngine = useMemo(() => getSearchEngine(settings.searchEngineId, customEngines), [settings.searchEngineId, customEngines]);
@@ -253,6 +255,9 @@ function App() {
           <IconButton label="Stats" onClick={() => { setStatsOpen((o) => !o); setHistoryOpen(false); }}>
             <BarChart3 size={18} className={statsOpen ? "text-[var(--accent)]" : ""} />
           </IconButton>
+          <IconButton label="Inspector" onClick={() => { setInspectorOpen((open) => !open); setStatsOpen(false); setHistoryOpen(false); }}>
+            <Bug size={18} className={inspectorOpen ? "text-[var(--accent)]" : ""} />
+          </IconButton>
           <IconButton label="Vault" onClick={() => setVaultOpen(true)}>
             <KeyRound size={18} className={vaultOpen ? "text-[var(--accent)]" : ""} />
           </IconButton>
@@ -292,6 +297,8 @@ function App() {
         onHome={handleHome}
         onRelayChange={handleRelayChange}
         autofillPayload={autofillPayload}
+        inspectorOpen={inspectorOpen}
+        onCloseInspector={() => setInspectorOpen(false)}
       />
 
       <SettingsPage

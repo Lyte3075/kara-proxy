@@ -260,7 +260,7 @@ export default function SettingsPage({
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="relative z-20 flex shrink-0 items-center justify-between px-6 py-4 border-b"
           style={{ borderColor: "var(--border-primary)" }}
         >
           <h2 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2 tracking-tight">
@@ -280,7 +280,7 @@ export default function SettingsPage({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 px-6 pt-4 overflow-x-auto scrollbar-thin">
+        <div className="relative z-20 flex shrink-0 flex-nowrap gap-1 px-6 pt-4 pb-3 overflow-x-auto scrollbar-thin border-b" style={{ borderColor: "var(--border-primary)", background: "var(--bg-elev)" }}>
           <TabBtn active={tab === "relay"} onClick={() => setTab("relay")} icon={<Server size={15} />}>Relay</TabBtn>
           <TabBtn active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={15} />}>Search</TabBtn>
           <TabBtn active={tab === "appearance"} onClick={() => setTab("appearance")} icon={<Palette size={15} />}>Appearance</TabBtn>
@@ -291,7 +291,7 @@ export default function SettingsPage({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
           {tab === "relay" && (
             <div className="space-y-4">
               <div>
@@ -892,7 +892,7 @@ function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick:
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition border"
+      className="flex shrink-0 items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition border whitespace-nowrap"
       style={active
         ? { background: "var(--accent-glow)", color: "var(--accent-bright)", borderColor: "var(--accent-soft)" }
         : { color: "var(--text-muted)", borderColor: "transparent" }

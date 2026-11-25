@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Home, Globe, RefreshCw } from "lucide-react";
 import type { Frame } from "@mercuryworkshop/scramjet-controller";
+import SiteInspector from "@/proxy/SiteInspector";
 import {
   createKaraFrame,
   getScramjetController,
+  normalizeWispEndpoint,
   type KaraFilterConfig,
 } from "@/proxy/scramjet";
 
@@ -21,6 +23,8 @@ interface ProxyViewProps {
   onHome: () => void;
   onRelayChange: (endpoint: string) => void;
   autofillPayload: { username: string; password: string; nonce: number } | null;
+  inspectorOpen: boolean;
+  onCloseInspector: () => void;
 }
 
 export default function ProxyView({
@@ -37,6 +41,8 @@ export default function ProxyView({
   onHome,
   onRelayChange,
   autofillPayload,
+  inspectorOpen,
+  onCloseInspector,
 }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const frameRef = useRef<Frame | null>(null);
@@ -53,6 +59,7 @@ export default function ProxyView({
 
   useEffect(() => {
     let cancelled = false;
+    const relayProbeAbort = new AbortController();
 
     const navigate = async () => {
       if (!iframeUrl || !iframeRef.current) return;
@@ -79,29 +86,108 @@ export default function ProxyView({
         } catch { return []; }
       };
 
+      // Probe the actual Wisp WebSocket endpoint. An HTTP /health request is
+      // not a reliable readiness check: some valid Wisp hosts expose no HTTP
+      // health route, and Safari may block cross-origin health responses.
       const wakeRelay = async (endpoint: string): Promise<void> => {
-        const health = new URL(endpoint);
-        health.protocol = "https:";
-        health.pathname = "/health";
-        health.search = "";
-        health.hash = "";
-        let lastError: unknown;
-        for (let attempt = 1; attempt <= 10; attempt += 1) {
-          if (cancelled) throw new Error("Relay check cancelled.");
-          setRelayStatus(attempt === 1 ? "Waking relay…" : "Waiting for host to wake… (attempt " + attempt + "/10)");
-          const abort = new AbortController();
-          const timeout = window.setTimeout(() => abort.abort(), 15000);
-          try {
-            const response = await fetch(health.toString(), { method: "GET", cache: "no-store", mode: "cors", credentials: "omit", signal: abort.signal });
-            if (!response.ok) throw new Error("Relay health check returned HTTP " + response.status + ".");
-            const data = await response.json();
-            if (data?.ok !== true || data?.protocol !== "wisp") throw new Error("This host did not return a valid Kara Wisp health response.");
+        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
+        const socketUrl = normalizeWispEndpoint(endpoint, relayToken);
+        setRelayStatus("Connecting to relay…");
+
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const socket = new WebSocket(socketUrl);
+          socket.binaryType = "arraybuffer";
+          const signal = relayProbeAbort.signal;
+          const timeout = window.setTimeout(() => {
+            finish(new Error("The Wisp handshake timed out. The relay accepted the WebSocket but did not confirm that it was ready."));
+          }, 12000);
+
+          const onAbort = () => finish(new Error("Relay check cancelled."));
+          const finish = (error?: Error) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            signal.removeEventListener("abort", onAbort);
+            socket.onopen = null;
+            socket.onmessage = null;
+            socket.onerror = null;
+            socket.onclose = null;
+            try { socket.close(); } catch {}
+            if (error) reject(error);
+            else resolve();
+          };
+
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) {
+            onAbort();
             return;
-          } catch (cause) { lastError = cause; }
-          finally { window.clearTimeout(timeout); }
-          if (attempt < 10) await new Promise((resolve) => window.setTimeout(resolve, 2500));
-        }
-        throw lastError instanceof Error ? lastError : new Error("Relay did not wake up in time.");
+          }
+
+          socket.onopen = () => {
+            // Kara's libcurl transport uses the Wisp v1 handshake. A successful
+            // WebSocket upgrade alone is not enough: v1 sends CONTINUE on
+            // stream 0 with the initial flow-control window once it is ready.
+            setRelayStatus("Negotiating Wisp protocol…");
+          };
+          socket.onmessage = async (event) => {
+            try {
+              let packetData: ArrayBuffer;
+              if (event.data instanceof ArrayBuffer) {
+                packetData = event.data;
+              } else if (event.data instanceof Blob) {
+                packetData = await event.data.arrayBuffer();
+              } else {
+                throw new Error("The relay returned a non-binary Wisp handshake packet.");
+              }
+
+              if (settled) return;
+              if (packetData.byteLength < 5) {
+                throw new Error("The relay returned an incomplete Wisp handshake packet.");
+              }
+
+              const packet = new DataView(packetData);
+              const packetType = packet.getUint8(0);
+              const streamId = packet.getUint32(1, true);
+              if (streamId !== 0) {
+                throw new Error("The relay sent a Wisp data packet before the connection handshake completed.");
+              }
+
+              if (packetType === 0x03) {
+                if (packet.byteLength < 9) {
+                  throw new Error("The relay sent an invalid Wisp CONTINUE packet.");
+                }
+                resolveHandshake();
+                return;
+              }
+
+              if (packetType === 0x04) {
+                if (packet.byteLength < 6) {
+                  throw new Error("The relay rejected the connection with an invalid Wisp CLOSE packet.");
+                }
+                const reason = packet.getUint8(5);
+                throw new Error("The Wisp relay rejected the connection (close reason 0x" + reason.toString(16).padStart(2, "0") + "). Check the relay's access token and server logs.");
+              }
+
+              if (packetType === 0x05) {
+                throw new Error("The relay selected Wisp v2, but Kara's current transport expects the Wisp v1 handshake.");
+              }
+
+              throw new Error("The relay returned an unexpected Wisp handshake packet (type 0x" + packetType.toString(16).padStart(2, "0") + ").");
+            } catch (cause) {
+              finish(cause instanceof Error ? cause : new Error("Could not validate the Wisp handshake."));
+            }
+          };
+          const resolveHandshake = () => finish();
+          socket.onerror = () => finish(new Error("Could not connect to the relay WebSocket. Check the WSS address and relay availability."));
+          socket.onclose = (event) => finish(new Error(
+            "The relay closed before completing the Wisp handshake" +
+            (event.code ? " (WebSocket " + event.code + ")" : "") +
+            (event.reason ? ": " + event.reason : ".")
+          ));
+        });
+
+        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
       };
 
       const saved = readSavedRelays();
@@ -115,7 +201,7 @@ export default function ProxyView({
         try {
           await wakeRelay(candidate.url);
           if (cancelled) return;
-          setRelayStatus("Relay awake. Connecting…");
+          setRelayStatus("Wisp handshake complete. Connecting…");
           connectedController = await getScramjetController(candidate.url, relayToken);
           if (index > 0) {
             setRelayStatus("Switched to backup: " + candidate.name);
@@ -151,6 +237,7 @@ export default function ProxyView({
     void navigate();
     return () => {
       cancelled = true;
+      relayProbeAbort.abort();
     };
   }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
 
@@ -222,10 +309,11 @@ export default function ProxyView({
         title="Browsing session"
         className="w-full h-full bg-black"
         style={{ display: iframeUrl && !error ? "block" : "none" }}
-        sandbox="allow-same-origin allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation"
+        sandbox="allow-same-origin allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-pointer-lock allow-presentation allow-storage-access-by-user-activation allow-top-navigation-by-user-activation allow-top-navigation-to-custom-protocols"
         allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture"
         referrerPolicy="no-referrer"
       />
+      <SiteInspector iframeRef={iframeRef} open={inspectorOpen && Boolean(iframeUrl) && !error} onClose={onCloseInspector} />
     </div>
   );
 }
