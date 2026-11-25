@@ -175,6 +175,13 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame) return;
+    if (!open) {
+      frame.style.width = "100%";
+      frame.style.height = "100%";
+      frame.style.maxWidth = "100%";
+      frame.style.margin = "0";
+      return;
+    }
     const preset = deviceSizes.find((item) => item.name === device);
     if (!preset || preset.width === 0) {
       frame.style.width = "100%";
@@ -193,7 +200,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
       frame.style.maxWidth = "100%";
       frame.style.margin = "0";
     };
-  }, [device, iframeRef]);
+  }, [device, iframeRef, open]);
 
   const allElements = useMemo(() => {
     if (!doc) return [];
@@ -325,7 +332,7 @@ export default function SiteInspector({ iframeRef, open, onClose }: SiteInspecto
           <div className="h-full flex flex-col">
             <div className="flex gap-2 p-2 border-b border-[#303540]">
               <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter requests…" className="flex-1 bg-[#20242d] rounded px-2 py-1.5 text-xs outline-none" />
-              <button onClick={() => { performance.clearResourceTimings(); setResources([]); }} className="text-xs text-slate-400 px-2">Clear</button>
+              <button onClick={() => { iframeRef.current?.contentWindow?.performance.clearResourceTimings(); setResources([]); }} className="text-xs text-slate-400 px-2">Clear</button>
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_65px_65px] gap-2 px-3 py-1.5 text-[10px] text-slate-500 border-b border-[#303540]"><span>Name</span><span>Type</span><span className="text-right">Time</span></div>
             <div className="overflow-auto flex-1">{visibleResources.map((item, index) => <div key={item.name + index} className="grid grid-cols-[minmax(0,1fr)_65px_65px] gap-2 px-3 py-1.5 text-[10px] border-b border-white/5 hover:bg-white/5"><span className="truncate" title={item.name}>{item.name.split("/").pop() || item.name}</span><span className="text-slate-400">{item.initiatorType}</span><span className="text-right text-slate-400">{item.duration.toFixed(0)} ms</span></div>)}
