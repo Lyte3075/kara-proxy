@@ -82,7 +82,16 @@ function scramjetCompatibilityPatches() {
   }
 
   MessagePort.prototype.postMessage = function(data, transferOrOptions) {
-    const transfer = Array.isArray(transferOrOptions) ? transferOrOptions : [];
+    // Support both postMessage(message, transferList) and the newer
+    // postMessage(message, { transfer: transferList }) overload.
+    const usesOptions = !!transferOrOptions &&
+      !Array.isArray(transferOrOptions) &&
+      typeof transferOrOptions === 'object';
+    const transfer = Array.isArray(transferOrOptions)
+      ? transferOrOptions
+      : (usesOptions && Array.isArray(transferOrOptions.transfer)
+        ? transferOrOptions.transfer
+        : []);
     const streams = transfer.filter(item =>
       typeof ReadableStream !== 'undefined' && item instanceof ReadableStream
     );
@@ -98,8 +107,13 @@ function scramjetCompatibilityPatches() {
       }
 
       const nextData = replaceStreams(data, replacements);
-      const nextTransfer = transfer.map(item => replacements.get(item) || item);
-      return nativePostMessage.call(this, nextData, nextTransfer);
+      const nextTransfer = transfer.map(item =>
+        replacements.has(item) ? replacements.get(item) : item
+      );
+      const nextTransferArgument = usesOptions
+        ? { ...transferOrOptions, transfer: nextTransfer }
+        : nextTransfer;
+      return nativePostMessage.call(this, nextData, nextTransferArgument);
     };
 
     const previous = pendingByPort.get(this);
