@@ -176,7 +176,7 @@ function App() {
 
   const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
   const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
-  const reload = useCallback(() => { if (activeTab.iframeUrl) { updateActiveTab({ loading: true }); const c = activeTab.iframeUrl; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
+  const reload = useCallback(() => { if (activeTab.url) { updateActiveTab({ loading: true }); const c = activeTab.url; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
   const handleProxiedNavigation = useCallback((url: string, title: string) => {
@@ -254,7 +254,7 @@ function App() {
   const handleAutofill = useCallback((e: VaultEntry) => { setAutofillPayload({ username: e.username, password: e.password, nonce: Date.now() }); setVaultOpen(false); }, []);
 
   /* ---------- derived ---------- */
-  const proxied = activeTab.iframeUrl ? (() => { try { return new URL(activeTab.iframeUrl).origin !== window.location.origin; } catch { return true; } })() : false;
+  const proxied = activeTab.url ? (() => { try { return new URL(activeTab.url).origin !== window.location.origin; } catch { return true; } })() : false;
   const blockedDomains = [...TRACKER_DOMAINS.filter((domain) => !stats.allowedDomains.includes(domain)), ...stats.customBlocklist];
   const canGoBack = activeTab.navIdx > 0;
   const canGoForward = activeTab.navIdx < activeTab.history.length - 1;
