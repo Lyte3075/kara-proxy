@@ -23,7 +23,7 @@ h2{font-size:16px;margin:0}.state{font-size:12px;color:#a1a1aa;border:1px solid 
 <main>
   <div class="eyebrow">Kara's Proxy · Diagnostics</div>
   <h1>WebKit stream test</h1>
-  <p class="sub">A small Safari-friendly check for request-body and response-body delivery through Kara's Scramjet browsing engine. Open this page <b>inside Kara's Proxy</b>, then run both tests.</p>
+  <p class="sub">A small Safari-friendly check for request-body and response-body delivery through Kara's Scramjet browsing engine. This page is launched from Kara's start screen so both requests run inside the proxied browsing frame.</p>
   <button id="run">Run both tests</button>
   <section class="panel">
     <div class="row"><h2>01 · Request body</h2><span id="post-state" class="state">Not run</span></div>
@@ -55,7 +55,7 @@ h2{font-size:16px;margin:0}.state{font-size:12px;color:#a1a1aa;border:1px solid 
     const payload=JSON.stringify({marker,check:"request-body",message:"Kara Scramjet WebKit compatibility test"});
     const response=await withTimeout(fetch("https://httpbin.org/post?kara="+Date.now(),{
       method:"POST",
-      headers:{"Content-Type":"application/json","Cache-Control":"no-store"},
+      headers:{"Content-Type":"text/plain;charset=UTF-8","Cache-Control":"no-store"},
       body:payload,
       cache:"no-store"
     }),30000,"POST request");
