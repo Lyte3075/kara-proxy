@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Home, Globe, RefreshCw } from "lucide-react";
 import type { Frame } from "@mercuryworkshop/scramjet-controller";
+import SiteInspector from "@/proxy/SiteInspector";
 import {
   createKaraFrame,
   getScramjetController,
@@ -22,6 +23,8 @@ interface ProxyViewProps {
   onHome: () => void;
   onRelayChange: (endpoint: string) => void;
   autofillPayload: { username: string; password: string; nonce: number } | null;
+  inspectorOpen: boolean;
+  onCloseInspector: () => void;
 }
 
 export default function ProxyView({
@@ -38,6 +41,8 @@ export default function ProxyView({
   onHome,
   onRelayChange,
   autofillPayload,
+  inspectorOpen,
+  onCloseInspector,
 }: ProxyViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const frameRef = useRef<Frame | null>(null);
@@ -237,6 +242,7 @@ export default function ProxyView({
         allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera; payment; picture-in-picture"
         referrerPolicy="no-referrer"
       />
+      <SiteInspector iframeRef={iframeRef} open={inspectorOpen && Boolean(iframeUrl) && !error} onClose={onCloseInspector} />
     </div>
   );
 }
