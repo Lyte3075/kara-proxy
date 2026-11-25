@@ -59,6 +59,7 @@ export default function ProxyView({
 
   useEffect(() => {
     let cancelled = false;
+    const relayProbeAbort = new AbortController();
 
     const navigate = async () => {
       if (!iframeUrl || !iframeRef.current) return;
@@ -89,21 +90,24 @@ export default function ProxyView({
       // not a reliable readiness check: some valid Wisp hosts expose no HTTP
       // health route, and Safari may block cross-origin health responses.
       const wakeRelay = async (endpoint: string): Promise<void> => {
-        if (cancelled) throw new Error("Relay check cancelled.");
+        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
         const socketUrl = normalizeWispEndpoint(endpoint, relayToken);
         setRelayStatus("Connecting to relay…");
 
         await new Promise<void>((resolve, reject) => {
           let settled = false;
           const socket = new WebSocket(socketUrl);
+          const signal = relayProbeAbort.signal;
           const timeout = window.setTimeout(() => {
             finish(new Error("The relay WebSocket connection timed out."));
           }, 12000);
 
+          const onAbort = () => finish(new Error("Relay check cancelled."));
           const finish = (error?: Error) => {
             if (settled) return;
             settled = true;
             window.clearTimeout(timeout);
+            signal.removeEventListener("abort", onAbort);
             socket.onopen = null;
             socket.onerror = null;
             socket.onclose = null;
@@ -112,12 +116,18 @@ export default function ProxyView({
             else resolve();
           };
 
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+
           socket.onopen = () => finish();
           socket.onerror = () => finish(new Error("Could not connect to the relay WebSocket. Check the WSS address and relay availability."));
           socket.onclose = () => finish(new Error("The relay closed the WebSocket before connecting."));
         });
 
-        if (cancelled) throw new Error("Relay check cancelled.");
+        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
       };
 
       const saved = readSavedRelays();
@@ -167,6 +177,7 @@ export default function ProxyView({
     void navigate();
     return () => {
       cancelled = true;
+      relayProbeAbort.abort();
     };
   }, [iframeUrl, relay, relayToken, onError, onRelayChange]);
 
