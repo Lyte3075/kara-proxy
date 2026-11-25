@@ -22,7 +22,7 @@ import {
   normalizeInput, recordBlocked, recordRequest,
   saveBookmarks, saveCustomEngines, saveEncryptedVault, saveHistory, saveSettings,
   saveShortcuts, saveStats, saveCustomPalettes, saveSpeedTest,
-  applyCustomPalette, uid,
+  applyCustomPalette, uid, buildTranslatedPageUrl, restoreOriginalPageUrl,
 } from "@/proxy/utils";
 
 function applyTabFavicon(faviconUrl: string) {
@@ -168,42 +168,53 @@ function App() {
     const finalTarget = normalized ?? buildSearchUrl(searchEngine, rawTarget.trim());
     const newHistory = tab.navIdx < tab.history.length - 1 ? tab.history.slice(0, tab.navIdx + 1) : [...tab.history];
     newHistory.push(finalTarget);
-    updateTab(tabId, { url: finalTarget, iframeUrl: finalTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
+    const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(finalTarget, settings.translateLanguage) : finalTarget;
+    updateTab(tabId, { url: finalTarget, iframeUrl: frameTarget, loading: true, error: null, history: newHistory, navIdx: newHistory.length - 1 });
     if (tabId === activeTabId) setInput(finalTarget);
     setStatsOpen(false); setHistoryOpen(false);
     setHistory((prev) => { const entry: HistoryEntry = { url: finalTarget, displayUrl: finalTarget.replace(/^https?:\/\//, ""), title: finalTarget.replace(/^https?:\/\//, ""), ts: Date.now() }; return [entry, ...prev.filter((h) => h.url !== finalTarget)].slice(0, 100); });
-  }, [tabs, activeTabId, searchEngine, updateTab]);
+  }, [tabs, activeTabId, searchEngine, settings.translateEnabled, settings.translateLanguage, updateTab]);
 
-  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
-  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; updateActiveTab({ navIdx: i, url: t, iframeUrl: t, loading: true, error: null }); setInput(t); }, [activeTab, updateActiveTab]);
-  const reload = useCallback(() => { if (activeTab.url) { updateActiveTab({ loading: true }); const c = activeTab.url; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, updateActiveTab]);
+  const goBack = useCallback(() => { if (activeTab.navIdx <= 0) return; const i = activeTab.navIdx - 1; const t = activeTab.history[i]; const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(t, settings.translateLanguage) : t; updateActiveTab({ navIdx: i, url: t, iframeUrl: frameTarget, loading: true, error: null }); setInput(t); }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
+  const goForward = useCallback(() => { if (activeTab.navIdx >= activeTab.history.length - 1) return; const i = activeTab.navIdx + 1; const t = activeTab.history[i]; const frameTarget = settings.translateEnabled ? buildTranslatedPageUrl(t, settings.translateLanguage) : t; updateActiveTab({ navIdx: i, url: t, iframeUrl: frameTarget, loading: true, error: null }); setInput(t); }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
+  const reload = useCallback(() => { if (activeTab.url) { updateActiveTab({ loading: true }); const c = settings.translateEnabled ? buildTranslatedPageUrl(activeTab.url, settings.translateLanguage) : activeTab.url; updateActiveTab({ iframeUrl: null }); requestAnimationFrame(() => updateActiveTab({ iframeUrl: c })); } }, [activeTab, settings.translateEnabled, settings.translateLanguage, updateActiveTab]);
   const handleLoad = useCallback(() => updateActiveTab({ loading: false }), [updateActiveTab]);
   const handleProxyError = useCallback((message: string) => updateActiveTab({ loading: false, error: message }), [updateActiveTab]);
   const handleProxiedNavigation = useCallback((url: string, title: string) => {
     setTabs((current) => current.map((tab) => {
       if (tab.id !== activeTabId) return tab;
+      const pageUrl = restoreOriginalPageUrl(url);
       const history = tab.history.slice();
-      if (history[tab.navIdx] !== url) {
+      if (history[tab.navIdx] !== pageUrl) {
         const nextHistory = history.slice(0, tab.navIdx + 1);
-        nextHistory.push(url);
-        return { ...tab, url, title, history: nextHistory, navIdx: nextHistory.length - 1, loading: false };
+        nextHistory.push(pageUrl);
+        return { ...tab, url: pageUrl, title, history: nextHistory, navIdx: nextHistory.length - 1, loading: false };
       }
-      return { ...tab, url, title, loading: false };
+      return { ...tab, url: pageUrl, title, loading: false };
     }));
-    if (document.activeElement?.id !== "kara-address-input") setInput(url);
+    if (document.activeElement?.id !== "kara-address-input") setInput(pageUrl);
     setHistory((current) => [{
-      url,
-      displayUrl: url.replace(/^https?:\/\//, ""),
-      title: title || url,
+      url: pageUrl,
+      displayUrl: pageUrl.replace(/^https?:\/\//, ""),
+      title: title || pageUrl,
       ts: Date.now(),
-    }, ...current.filter((entry) => entry.url !== url)].slice(0, 100));
+    }, ...current.filter((entry) => entry.url !== pageUrl)].slice(0, 100));
   }, [activeTabId]);
   const handleRelayChange = useCallback((endpoint: string) => setSettings((current) => ({ ...current, relay: endpoint })), []);
   const handleHome = useCallback(() => { updateActiveTab({ url: null, iframeUrl: null, loading: false, error: null }); setInput(""); setHistoryOpen(false); setStatsOpen(false); }, [updateActiveTab]);
   useEffect(() => { setInput(activeTab.url ?? ""); }, [activeTabId]); // eslint-disable-line
 
   /* ---------- settings & data ---------- */
-  const handleSaveSettings = useCallback((s: Settings) => setSettings(s), []);
+  const handleSaveSettings = useCallback((s: Settings) => {
+    const translationChanged = s.translateEnabled !== settings.translateEnabled || s.translateLanguage !== settings.translateLanguage;
+    setSettings(s);
+    if (translationChanged) {
+      setTabs((current) => current.map((tab) => {
+        if (tab.id !== activeTabId || !tab.url) return tab;
+        return { ...tab, iframeUrl: s.translateEnabled ? buildTranslatedPageUrl(tab.url, s.translateLanguage) : tab.url, loading: true, error: null };
+      }));
+    }
+  }, [activeTabId, settings.translateEnabled, settings.translateLanguage]);
   const addShortcut = useCallback((title: string, url: string) => setShortcuts((p) => [...p, { id: uid(), title, url }]), []);
   const removeShortcut = useCallback((id: string) => setShortcuts((p) => p.filter((s) => s.id !== id)), []);
   const addBookmark = useCallback((title: string, url: string) => setBookmarks((p) => [{ id: uid(), title, url, ts: Date.now() }, ...p]), []);
