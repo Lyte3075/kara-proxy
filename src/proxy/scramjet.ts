@@ -94,6 +94,35 @@ function createSafeTransport(
 
   return new Proxy(client, {
     get(target, property, receiver) {
+      if (property === "connect") {
+        return (...args: Parameters<LibcurlClient["connect"]>) => {
+          let intentionallyClosed = false;
+          const originalClose = args[5];
+          const originalError = args[6];
+          const monitoredArgs: Parameters<LibcurlClient["connect"]> = [
+            args[0], args[1], args[2], args[3], args[4],
+            (code, reason) => {
+              if (!intentionallyClosed && code !== 1000 && code !== 1001) {
+                onRequestFailure?.(new Error("A proxied WebSocket closed unexpectedly (" + code + "): " + reason));
+              }
+              originalClose(code, reason);
+            },
+            (error) => {
+              if (!intentionallyClosed) onRequestFailure?.(new Error("A proxied WebSocket transport failed: " + error));
+              originalError(error);
+            },
+          ];
+          const [send, close] = target.connect(...monitoredArgs);
+          return [
+            send,
+            (code, reason) => {
+              intentionallyClosed = true;
+              close(code, reason);
+            },
+          ] as ReturnType<LibcurlClient["connect"]>;
+        };
+      }
+
       if (property === "request") {
         return async (...args: Parameters<LibcurlClient["request"]>) => {
           try {
