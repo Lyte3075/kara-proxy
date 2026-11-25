@@ -70,7 +70,7 @@ const karaCanTransferReadableStream = (() => {
       );
       api = api.replace(
         transferPattern,
-        '[responseBody]'
+        'responseBody instanceof ReadableStream || responseBody instanceof ArrayBuffer ? [responseBody] : []'
       );
       if (!api.includes('karaCanTransferReadableStream')) {
         const marker = 'class Controller';
