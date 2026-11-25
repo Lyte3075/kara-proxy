@@ -103,6 +103,42 @@ function createSafeTransport(
                 ReturnType<LibcurlClient["request"]>
               >;
             }
+
+            // A Wisp socket can die after response headers have arrived. In
+            // that case target.request() has already resolved, so the outer
+            // catch cannot see the failure. Observe the body stream itself and
+            // refresh the transport for future requests if reading it fails.
+            if (response.body && typeof ReadableStream !== "undefined") {
+              const reader = response.body.getReader();
+              let finished = false;
+              const monitoredBody = new ReadableStream<Uint8Array>({
+                async pull(streamController) {
+                  if (finished) return;
+                  try {
+                    const result = await reader.read();
+                    if (result.done) {
+                      finished = true;
+                      reader.releaseLock();
+                      streamController.close();
+                    } else {
+                      streamController.enqueue(result.value);
+                    }
+                  } catch (error) {
+                    finished = true;
+                    try { reader.releaseLock(); } catch {}
+                    onRequestFailure?.(error);
+                    streamController.error(error);
+                  }
+                },
+                async cancel(reason) {
+                  finished = true;
+                  try { await reader.cancel(reason); } catch {}
+                },
+              });
+              return { ...response, body: monitoredBody } as unknown as Awaited<
+                ReturnType<LibcurlClient["request"]>
+              >;
+            }
             return response;
           } catch (error) {
             // An aborted navigation is expected and should not trigger a
