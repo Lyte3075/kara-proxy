@@ -222,7 +222,23 @@ export default function ProxyView({
         : new Error("No reachable Wisp relay is saved. Add another WSS endpoint in Settings.");
       if (cancelled || !iframeRef.current) return;
       if (!frameRef.current) {
-        frameRef.current = createKaraFrame(connectedController, iframeRef.current, () => filterConfigRef.current);
+        frameRef.current = createKaraFrame(
+          connectedController,
+          iframeRef.current,
+          () => filterConfigRef.current,
+          (url) => {
+            let title = "";
+            try {
+              title = iframeRef.current?.contentDocument?.title || "";
+            } catch {
+              // The document may be transitioning between proxied pages.
+            }
+            if (!title) {
+              try { title = new URL(url).hostname; } catch { title = "Loading page"; }
+            }
+            callbacksRef.current.onNavigate(url, title);
+          }
+        );
       }
       const latestUrl = latestUrlRef.current;
       if (!latestUrl) return;
@@ -245,64 +261,8 @@ export default function ProxyView({
     };
   }, [iframeUrl, relay, relayToken]);
 
-  // Keep Kara's browser chrome synchronized with Scramjet's virtual page.
-  // Safari can briefly expose about:blank while the controller is attaching
-  // the frame, so never publish that placeholder as the visited URL.
-  useEffect(() => {
-    if (!iframeUrl || hidden) return;
-    let lastUrl = "";
-    let lastTitle = "";
-    const readCurrentPage = () => {
-      const frameWindow = iframeRef.current?.contentWindow;
-      if (!frameWindow) return;
-      let frameHref = "";
-      let title = "";
-      try {
-        frameHref = frameWindow.location.href;
-        if (frameHref && frameHref !== "about:blank") {
-          title = frameWindow.document.title || "";
-        }
-      } catch {
-        // The virtual frame can be temporarily unreadable during navigation.
-      }
-
-      let targetUrl = "";
-      if (frameHref && frameHref !== "about:blank") {
-        try {
-          const frameLocation = new URL(frameHref);
-          const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
-          if (!base.pathname.endsWith("/")) base.pathname += "/";
-          const marker = base.pathname + "~/sj/";
-          const markerIndex = frameLocation.pathname.indexOf(marker);
-          if (markerIndex >= 0) {
-            const encodedTarget = frameLocation.pathname.slice(markerIndex + marker.length);
-            const decodedTarget = decodeURIComponent(encodedTarget);
-            targetUrl = new URL(decodedTarget + frameLocation.search + frameLocation.hash).href;
-          } else if (frameLocation.origin !== window.location.origin) {
-            targetUrl = frameLocation.href;
-          }
-        } catch {
-          // Keep the last known destination if Safari reports a transient URL.
-        }
-      }
-
-      // The iframe starts at about:blank before Scramjet's Frame.go() takes
-      // effect. Use the requested destination until the virtual URL is ready.
-      if (!targetUrl) targetUrl = lastUrl || iframeUrl;
-      if (targetUrl === "about:blank") return;
-      if (!title) {
-        try { title = new URL(targetUrl).hostname; } catch { title = "Loading page"; }
-      }
-      if (targetUrl !== lastUrl || title !== lastTitle) {
-        lastUrl = targetUrl;
-        lastTitle = title;
-        callbacksRef.current.onNavigate(targetUrl, title);
-      }
-    };
-    const timer = window.setInterval(readCurrentPage, 400);
-    readCurrentPage();
-    return () => window.clearInterval(timer);
-  }, [iframeUrl, hidden]);
+  // Scramjet's URL watcher reports real navigations, SPA history changes,
+  // and hash changes directly. No iframe URL parsing or polling is needed.
 
   useEffect(() => {
     setSlowLoad(false);
