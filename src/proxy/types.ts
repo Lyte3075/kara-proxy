@@ -77,11 +77,11 @@ export const DEFAULT_THEME_MODE: ThemeMode = "dark";
 export const DEFAULT_BLOCK_TRACKERS = false;
 
 export const THEME_COLORS: { id: ThemeColor; name: string }[] = [
-  { id: "red", name: "Crimson" },
-  { id: "blue", name: "Azure" },
-  { id: "green", name: "Emerald" },
+  { id: "red", name: "Kara" },
+  { id: "blue", name: "Bert" },
+  { id: "green", name: "Emily" },
   { id: "amber", name: "Amber" },
-  { id: "violet", name: "Violet" },
+  { id: "violet", name: "James" },
   { id: "black", name: "Lyte" },
 ];
 
