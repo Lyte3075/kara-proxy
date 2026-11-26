@@ -90,110 +90,6 @@ export default function ProxyView({
         } catch { return []; }
       };
 
-      // Probe the actual Wisp WebSocket endpoint. An HTTP /health request is
-      // not a reliable readiness check: some valid Wisp hosts expose no HTTP
-      // health route, and Safari may block cross-origin health responses.
-      const wakeRelay = async (endpoint: string): Promise<void> => {
-        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
-        const socketUrl = normalizeWispEndpoint(endpoint, relayToken);
-        setRelayStatus("Connecting to relay…");
-
-        await new Promise<void>((resolve, reject) => {
-          let settled = false;
-          const socket = new WebSocket(socketUrl);
-          socket.binaryType = "arraybuffer";
-          const signal = relayProbeAbort.signal;
-          const timeout = window.setTimeout(() => {
-            finish(new Error("The Wisp handshake timed out. The relay accepted the WebSocket but did not confirm that it was ready."));
-          }, 12000);
-
-          const onAbort = () => finish(new Error("Relay check cancelled."));
-          const finish = (error?: Error) => {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timeout);
-            signal.removeEventListener("abort", onAbort);
-            socket.onopen = null;
-            socket.onmessage = null;
-            socket.onerror = null;
-            socket.onclose = null;
-            try { socket.close(); } catch {}
-            if (error) reject(error);
-            else resolve();
-          };
-
-          signal.addEventListener("abort", onAbort, { once: true });
-          if (signal.aborted) {
-            onAbort();
-            return;
-          }
-
-          socket.onopen = () => {
-            // Kara's libcurl transport uses the Wisp v1 handshake. A successful
-            // WebSocket upgrade alone is not enough: v1 sends CONTINUE on
-            // stream 0 with the initial flow-control window once it is ready.
-            setRelayStatus("Negotiating Wisp protocol…");
-          };
-          socket.onmessage = async (event) => {
-            try {
-              let packetData: ArrayBuffer;
-              if (event.data instanceof ArrayBuffer) {
-                packetData = event.data;
-              } else if (event.data instanceof Blob) {
-                packetData = await event.data.arrayBuffer();
-              } else {
-                throw new Error("The relay returned a non-binary Wisp handshake packet.");
-              }
-
-              if (settled) return;
-              if (packetData.byteLength < 5) {
-                throw new Error("The relay returned an incomplete Wisp handshake packet.");
-              }
-
-              const packet = new DataView(packetData);
-              const packetType = packet.getUint8(0);
-              const streamId = packet.getUint32(1, true);
-              if (streamId !== 0) {
-                throw new Error("The relay sent a Wisp data packet before the connection handshake completed.");
-              }
-
-              if (packetType === 0x03) {
-                if (packet.byteLength < 9) {
-                  throw new Error("The relay sent an invalid Wisp CONTINUE packet.");
-                }
-                resolveHandshake();
-                return;
-              }
-
-              if (packetType === 0x04) {
-                if (packet.byteLength < 6) {
-                  throw new Error("The relay rejected the connection with an invalid Wisp CLOSE packet.");
-                }
-                const reason = packet.getUint8(5);
-                throw new Error("The Wisp relay rejected the connection (close reason 0x" + reason.toString(16).padStart(2, "0") + "). Check the relay's access token and server logs.");
-              }
-
-              if (packetType === 0x05) {
-                throw new Error("The relay selected Wisp v2, but Kara's current transport expects the Wisp v1 handshake.");
-              }
-
-              throw new Error("The relay returned an unexpected Wisp handshake packet (type 0x" + packetType.toString(16).padStart(2, "0") + ").");
-            } catch (cause) {
-              finish(cause instanceof Error ? cause : new Error("Could not validate the Wisp handshake."));
-            }
-          };
-          const resolveHandshake = () => finish();
-          socket.onerror = () => finish(new Error("Could not connect to the relay WebSocket. Check the WSS address and relay availability."));
-          socket.onclose = (event) => finish(new Error(
-            "The relay closed before completing the Wisp handshake" +
-            (event.code ? " (WebSocket " + event.code + ")" : "") +
-            (event.reason ? ": " + event.reason : ".")
-          ));
-        });
-
-        if (cancelled || relayProbeAbort.signal.aborted) throw new Error("Relay check cancelled.");
-      };
-
       const saved = readSavedRelays();
       const candidates = [{ name: "Current relay", url: relay.trim() }, ...saved].filter((item, index, all) =>
         item.url && all.findIndex((candidate) => candidate.url === item.url) === index
@@ -203,9 +99,10 @@ export default function ProxyView({
       for (let index = 0; index < candidates.length; index += 1) {
         const candidate = candidates[index];
         try {
-          await wakeRelay(candidate.url);
           if (cancelled) return;
-          setRelayStatus("Wisp handshake complete. Connecting…");
+          setRelayStatus("Connecting to " + candidate.name + "…");
+          // Let libcurl-transport perform the real Wisp v1/v2 negotiation.
+          // A separate raw WebSocket probe cannot correctly validate Wisp v2.
           connectedController = await getScramjetController(candidate.url, relayToken);
           if (index > 0) {
             setRelayStatus("Switched to backup: " + candidate.name);
