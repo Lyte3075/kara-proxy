@@ -1,3 +1,5 @@
+import defaults from "../../defaults.json";
+
 export interface HistoryEntry {
   url: string;
   displayUrl: string;
@@ -69,7 +71,7 @@ export interface Settings {
   translateLanguage: string;
 }
 
-export const DEFAULT_RELAY = "wss://kara-wisp.enzonic.dev/wisp/";
+export const DEFAULT_RELAY = defaults.wispServers[0]?.url ?? "wss://kara-wisp.enzonic.dev/wisp/";
 export const DEFAULT_RELAY_TOKEN = "";
 export const DEFAULT_SEARCH_ENGINE_ID = "duckduckgo";
 export const DEFAULT_THEME_COLOR: ThemeColor = "red";
