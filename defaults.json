@@ -4,6 +4,11 @@
       "id": "kara-enzonic",
       "name": "Kara Wisp (Enzonic)",
       "url": "wss://kara-wisp.enzonic.dev/wisp/"
+    },
+    {
+      "id": "kara-render",
+      "name": "Kara Proxy Wisp (Render)",
+      "url": "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
     }
   ],
   "shortcuts": [
