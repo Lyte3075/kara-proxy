@@ -1,0 +1,36 @@
+{
+  "wispServers": [
+    {
+      "id": "kara-enzonic",
+      "name": "Kara Wisp (Enzonic)",
+      "url": "wss://kara-wisp.enzonic.dev/wisp/"
+    }
+  ],
+  "shortcuts": [
+    {
+      "id": "youtube",
+      "title": "YouTube",
+      "url": "https://www.youtube.com/"
+    },
+    {
+      "id": "google",
+      "title": "Google",
+      "url": "https://www.google.com/"
+    },
+    {
+      "id": "github",
+      "title": "GitHub",
+      "url": "https://github.com/"
+    },
+    {
+      "id": "discord",
+      "title": "Discord",
+      "url": "https://discord.com/app"
+    },
+    {
+      "id": "reddit",
+      "title": "Reddit",
+      "url": "https://www.reddit.com/"
+    }
+  ]
+}
