@@ -1,3 +1,4 @@
+import defaults from "../../defaults.json";
 import type {
   HistoryEntry,
   Settings,
@@ -41,10 +42,7 @@ export function saveHistory(entries: HistoryEntry[]): void {
 
 /* ---------- settings ---------- */
 
-const BUILT_IN_RELAYS = [
-  { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/wisp/", addedAt: 0 },
-  { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/", addedAt: 0 },
-];
+const BUILT_IN_RELAYS = defaults.wispServers.map((server) => ({ ...server, addedAt: 0 }));
 
 function ensureBuiltInRelays(): void {
   try {
@@ -97,9 +95,29 @@ export function saveSettings(settings: Settings): void {
 /* ---------- shortcuts ---------- */
 
 export function loadShortcuts(): Shortcut[] {
-  try { const r = localStorage.getItem(STORAGE_KEYS.shortcuts); return r ? JSON.parse(r) : []; } catch { return []; }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.shortcuts);
+    const stored = raw ? JSON.parse(raw) : [];
+    const shortcuts = Array.isArray(stored) ? stored as Shortcut[] : [];
+    const hiddenRaw = localStorage.getItem("kara.hidden-default-shortcuts");
+    const hidden = hiddenRaw ? JSON.parse(hiddenRaw) : [];
+    const hiddenIds = new Set(Array.isArray(hidden) ? hidden.filter((id): id is string => typeof id === "string") : []);
+    const defaultIds = new Set(defaults.shortcuts.map((shortcut) => shortcut.id));
+    const custom = shortcuts.filter((shortcut) => !defaultIds.has(shortcut.id));
+    const visibleDefaults = defaults.shortcuts.filter((shortcut) => !hiddenIds.has(shortcut.id));
+    return [...visibleDefaults, ...custom];
+  } catch {
+    return defaults.shortcuts;
+  }
 }
-export function saveShortcuts(s: Shortcut[]): void { try { localStorage.setItem(STORAGE_KEYS.shortcuts, JSON.stringify(s)); } catch {} }
+export function saveShortcuts(s: Shortcut[]): void {
+  try {
+    const visibleIds = new Set(s.map((shortcut) => shortcut.id));
+    const hiddenDefaults = defaults.shortcuts.filter((shortcut) => !visibleIds.has(shortcut.id)).map((shortcut) => shortcut.id);
+    localStorage.setItem(STORAGE_KEYS.shortcuts, JSON.stringify(s));
+    localStorage.setItem("kara.hidden-default-shortcuts", JSON.stringify(hiddenDefaults));
+  } catch {}
+}
 
 /* ---------- bookmarks ---------- */
 
