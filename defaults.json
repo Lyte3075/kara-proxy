@@ -1,0 +1,46 @@
+{
+  "wispServers": [
+    {
+      "id": "kara-enzonic",
+      "name": "Kara Wisp (Enzonic)",
+      "url": "wss://kara-wisp.enzonic.dev/wisp/"
+    },
+    {
+      "id": "kara-render",
+      "name": "Kara Proxy Wisp (Render)",
+      "url": "wss://kara-wisp-relay-p9eh.onrender.com/wisp/"
+    }
+  ],
+  "shortcuts": [
+    {
+      "id": "youtube",
+      "title": "YouTube",
+      "url": "https://www.youtube.com/"
+    },
+    {
+      "id": "discord",
+      "title": "Discord",
+      "url": "https://discord.com/app"
+    },
+    {
+      "id": "spotify",
+      "title": "Spotify",
+      "url": "https://spotify.com/"
+    },
+    {
+      "id": "chatgpt",
+      "title": "ChatGPT",
+      "url": "https://chatgpt.com/"
+    },
+    {
+      "id": "poki",
+      "title": "Poki",
+      "url": "https://poki.com/"
+    },
+    {
+      "id": "github",
+      "title": "GitHub",
+      "url": "https://github.com/"
+    },
+  ]
+}
