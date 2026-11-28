@@ -18,24 +18,29 @@
       "url": "https://www.youtube.com/"
     },
     {
-      "id": "google",
-      "title": "Google",
-      "url": "https://www.google.com/"
+      "id": "discord",
+      "title": "Discord",
+      "url": "https://discord.com/app"
+    },
+    {
+      "id": "spotify",
+      "title": "Spotify",
+      "url": "https://spotify.com/"
+    },
+    {
+      "id": "chatgpt",
+      "title": "ChatGPT",
+      "url": "https://chatgpt.com/"
+    },
+    {
+      "id": "poki",
+      "title": "Poki",
+      "url": "https://poki.com/"
     },
     {
       "id": "github",
       "title": "GitHub",
       "url": "https://github.com/"
     },
-    {
-      "id": "discord",
-      "title": "Discord",
-      "url": "https://discord.com/app"
-    },
-    {
-      "id": "reddit",
-      "title": "Reddit",
-      "url": "https://www.reddit.com/"
-    }
   ]
 }
