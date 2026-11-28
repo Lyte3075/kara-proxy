@@ -21,6 +21,7 @@ import {
   Languages,
 } from "lucide-react";
 import type { Settings, BackupFile, EncryptedVault, HistoryEntry, Bookmark, SearchEngine, ProxyStats, ThemeColor, ThemeMode, CustomPalette } from "@/proxy/types";
+import defaults from "../../defaults.json";
 import { DEFAULT_RELAY, DEFAULT_RELAY_TOKEN, SEARCH_ENGINES, THEME_COLORS } from "@/proxy/types";
 import {
   buildBackupFile,
@@ -57,10 +58,7 @@ interface SettingsPageProps {
 
 type Tab = "relay" | "search" | "translate" | "appearance" | "cloaking" | "stats" | "data" | "vault";
 
-const BUILT_IN_RELAYS = [
-  { id: "kara-prod-page", name: "Kara Default (Blitz) · 1.5 GB RAM", url: "wss://kara.prod.page/wisp/", addedAt: 0 },
-  { id: "kara-render", name: "Kara Proxy Wisp (Render)", url: "wss://kara-wisp-relay-p9eh.onrender.com/wisp/", addedAt: 0 },
-];
+const BUILT_IN_RELAYS = defaults.wispServers.map((server) => ({ ...server, addedAt: 0 }));
 
 export default function SettingsPage({
   open,
@@ -332,7 +330,7 @@ export default function SettingsPage({
               <div className="rounded-xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <p className="text-xs text-[var(--text-muted)] mb-2">Current relay</p>
                 <p className="text-sm font-mono text-[var(--accent-bright)] break-all">{relay || "Not configured"}</p>
-                <p className="text-xs text-[var(--text-faint)] mt-2">The Kara .prod.page relay is preselected for new users. Kara Proxy Wisp on Render is included as a backup.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-2">The first server in defaults.json is preselected for new users. Every server listed in defaults.json appears here as a built-in option.</p>
               </div>
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-surface)" }}>
                 <div className="flex items-center justify-between gap-2">
